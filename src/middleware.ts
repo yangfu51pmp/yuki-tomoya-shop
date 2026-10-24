@@ -36,10 +36,10 @@ export function middleware(req: NextRequest) {
   }
 
   // 4. 未通過驗證跳出輸入框
-  return new NextResponse("Sport Café 專屬預覽：請輸入管理密碼訪問", {
+  return new NextResponse("ユキ&トモヤ 日本選物代購 專屬預覽：請輸入管理密碼訪問", {
     status: 401,
     headers: {
-      "WWW-Authenticate": 'Basic realm="Sport Cafe Private Staging"',
+      "WWW-Authenticate": 'Basic realm="ユキ&トモヤ 日本選物代購 Private Staging"',
     },
   });
 }
