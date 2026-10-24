@@ -13,7 +13,7 @@ export default function HomePage() {
   const [siteAnnouncementUrl, setSiteAnnouncementUrl] = useState("");
 
   // 動態綁定網站主視覺背景
-  const [siteHeroImage, setSiteHeroImage] = useState("https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1080&auto=format&fit=crop"); // 東京街景
+  const [siteHeroImage, setSiteHeroImage] = useState(""); // 新背景圖
 
   // 動態綁定影片區塊
   const [sitePromoVideo, setSitePromoVideo] = useState("https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-large.mp4");
