@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
     const [
       site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation,
       cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8,
-      cat_products_1, cat_products_2, cat_products_3
+      cat_products_1, cat_products_2, cat_products_3, video_ai_script
     ] = await Promise.all([
       client.get("yt_site_title"),
       client.get("yt_site_announcement"),
@@ -147,6 +147,7 @@ export async function GET(req: NextRequest) {
       client.get("yt_cat_products_1"),
       client.get("yt_cat_products_2"),
       client.get("yt_cat_products_3"),
+      client.get("yt_video_ai_script"),
     ]);
     await client.quit();
 
@@ -171,6 +172,7 @@ export async function GET(req: NextRequest) {
         cat_products_1: cat_products_1 ? JSON.parse(cat_products_1) : null,
         cat_products_2: cat_products_2 ? JSON.parse(cat_products_2) : null,
         cat_products_3: cat_products_3 ? JSON.parse(cat_products_3) : null,
+        video_ai_script: video_ai_script ? JSON.parse(video_ai_script) : null,
       },
       {
         headers: {
@@ -1041,14 +1043,116 @@ export async function POST(req: NextRequest) {
                     console.error("Failed to fetch video preview:", e);
                   }
 
+                  const pendingAiVideo = await client.get("yt_pending_ai_video");
+                  if (pendingAiVideo) {
+                    await client.del("yt_pending_ai_video");
+                    let aiSuccess = false;
+                    try {
+                      const parsedAi = JSON.parse(pendingAiVideo);
+                      const hint = parsedAi.hint || "日本商品開箱介紹";
+                      const scriptPrompt = `請分析這段影片內容（包含畫面與語音），這是一個日系商品選物平台（ユキ&トモヤ）的宣傳短片，主題是「${hint}」。請為這段影片產生一個「時間軸特效腳本」，輸出必須是嚴格的 JSON 格式（不要加上 \`\`\`json 標籤，純粹輸出 JSON），結構如下：
+{
+  "enabled": true,
+  "cover": {
+    "issue": "ISSUE 01｜日本現場實拍",
+    "title": "6~10字吸睛大標題",
+    "subtitle": "一句話副標題",
+    "stamp": "日本嚴選",
+    "speakerName": "ユキ&トモヤ",
+    "speakerTitle": "日本連線代購嚴選"
+  },
+  "qaCard": {
+    "start": 1.2,
+    "end": 5.0,
+    "author": "ユキ&トモヤ・Q&A",
+    "question": "大家最常問的核心問題？"
+  },
+  "numberedPills": [
+    { "number": 1, "text": "重點特色一", "side": "left", "start": 5.5, "end": 11.0 }
+  ],
+  "bigKeywords": [
+    { "text": "4字核心大字", "badge": "必看亮點", "start": 3.5, "end": 6.5 }
+  ],
+  "checklistCard": {
+    "title": "推薦入手族群",
+    "items": ["注重書寫手感", "喜愛日本限定品質"],
+    "start": 11.5,
+    "end": 18.0
+  },
+  "subtitles": [
+    { "start": 0.0, "end": 2.5, "text": "完整字幕句子", "highlight": "要高亮放大的關鍵字" }
+  ]
+}
+
+請根據你觀察到的影片長度、語音節奏和畫面動作，合理分配 start 和 end 時間（單位為秒）。如果不確定長度，假設長度為 30 秒，均勻分配。請務必直接返回合法的 JSON 字串。`;
+
+                      const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          contents: [{
+                            parts: [
+                              { inlineData: { data: b64, mimeType: "video/mp4" } },
+                              { text: scriptPrompt }
+                            ]
+                          }]
+                        })
+                      });
+
+                      let jsonString = '';
+                      if (aiRes.ok) {
+                        const aiData = await aiRes.json();
+                        jsonString = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                      } else {
+                        // Fallback to openrouter
+                        if (OPENROUTER_API_KEY) {
+                           const fallbackRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
+                             body: JSON.stringify({
+                               model: 'openai/gpt-4o',
+                               messages: [{ role: 'user', content: scriptPrompt }]
+                             })
+                           });
+                           if (fallbackRes.ok) {
+                              const fallbackData = await fallbackRes.json();
+                              jsonString = fallbackData?.choices?.[0]?.message?.content || '';
+                           }
+                        }
+                      }
+
+                      jsonString = jsonString.replace(/```json/gi, '').replace(/```/g, '').trim();
+                      if (jsonString) {
+                         JSON.parse(jsonString); // Validate
+                         await client.set("yt_video_ai_script", jsonString);
+                         aiSuccess = true;
+                      }
+                    } catch (e) {
+                      console.error("AI Video script generation failed", e);
+                    }
+                    if (!aiSuccess) {
+                      await client.set("yt_video_ai_script", "null");
+                    }
+                  } else {
+                    await client.set("yt_video_ai_script", "null");
+                  }
+
+
                   await client.quit();
 
                   try { revalidatePath("/"); } catch {}
 
-                  await replyLine(
-                    replyToken,
-                    "✅ 已成功接收您的影片（自動適配橫式／直式比例）並推送至 GitHub！Vercel 正在背景部署中（約 20 秒後生效），稍後請輸入『截圖』驗收！"
-                  , undefined, targetId, startTime);
+                  if (pendingAiVideo) {
+                    await replyLine(
+                      replyToken,
+                      "✅ 🎬 已收到您的影片！AI 導演已經完成看片聽音，為您成功生成專屬動態雜誌風腳本！\nGitHub 已更新並在 Vercel 部署中（約 20 秒後生效），請於首頁查看 AI 自動製片成果！"
+                    , undefined, targetId, startTime);
+                  } else {
+                    await replyLine(
+                      replyToken,
+                      "✅ 已成功接收您的影片（自動適配橫式／直式比例）並推送至 GitHub！Vercel 正在背景部署中（約 20 秒後生效），稍後請輸入『截圖』驗收！"
+                    , undefined, targetId, startTime);
+                  }
                   continue;
                 } else {
                   await client.quit();
@@ -1391,6 +1495,62 @@ export async function POST(req: NextRequest) {
           replyToken,
           "請在 5 分鐘內直接傳送一張照片到群組，我會立刻幫您換成官網首頁背景！"
         , undefined, targetId, startTime);
+        continue;
+      }
+
+      // 8.1.5.5 AI 製片
+      const aiVideoMatch = cleanText.match(/^(?:AI|ai)?\s*(?:製片|剪片|剪輯|特效影片|自動製片)(?:[:：]\s*(.*))?$/);
+      if (aiVideoMatch && REDIS_URL) {
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        await client.set("yt_pending_ai_video", JSON.stringify({ mode: 'ai_edit', hint: aiVideoMatch[1] || '' }), { EX: 300 });
+        await client.set("yt_awaiting_video_upload", "1", { EX: 300 }); // Also trigger video wait mode
+        await client.quit();
+
+        await replyLine(
+          replyToken,
+          "🎬【AI 自動製片導演已就緒】\n請在 5 分鐘內直接從手機傳送一段『原始未剪輯影片』到群組！\nAI 將自動看片聽音，為您加上：\n✨ 日系雜誌風開場封面\n💬 Q&A 動態提問對話框\n🔢 ①②③ 重點編號膠囊標籤\n📝 底部關鍵字高亮動態字幕！"
+        , undefined, targetId, startTime);
+        continue;
+      }
+
+      const disableEffectMatch = cleanText.match(/^關閉影片特效$/);
+      if (disableEffectMatch && REDIS_URL) {
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        const rawScript = await client.get("yt_video_ai_script");
+        if (rawScript) {
+          try {
+            const parsed = JSON.parse(rawScript);
+            parsed.enabled = false;
+            await client.set("yt_video_ai_script", JSON.stringify(parsed));
+          } catch(e) {
+            console.error(e);
+          }
+        }
+        await client.quit();
+        try { revalidatePath("/"); } catch {}
+        await replyLine(replyToken, "✨ 已關閉影片特效！", undefined, targetId, startTime);
+        continue;
+      }
+
+      const enableEffectMatch = cleanText.match(/^開啟影片特效$/);
+      if (enableEffectMatch && REDIS_URL) {
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        const rawScript = await client.get("yt_video_ai_script");
+        if (rawScript) {
+          try {
+            const parsed = JSON.parse(rawScript);
+            parsed.enabled = true;
+            await client.set("yt_video_ai_script", JSON.stringify(parsed));
+          } catch(e) {
+            console.error(e);
+          }
+        }
+        await client.quit();
+        try { revalidatePath("/"); } catch {}
+        await replyLine(replyToken, "✨ 已開啟影片特效！", undefined, targetId, startTime);
         continue;
       }
 

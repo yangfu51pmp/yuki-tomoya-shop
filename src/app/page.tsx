@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import AiVideoPlayer from "@/components/AiVideoPlayer";
 
 export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -18,6 +19,7 @@ export default function HomePage() {
   // 動態綁定影片區塊
   const [sitePromoVideo, setSitePromoVideo] = useState("https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-large.mp4");
   const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ ユキ&トモヤ 日本現場連線實拍");
+  const [aiScript, setAiScript] = useState<any>(null);
 
   // 分類圖片
   const [catImg1, setCatImg1] = useState("https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?w=800&q=80"); // 文具
@@ -105,6 +107,8 @@ export default function HomePage() {
         if (data?.cat_products_1 && data.cat_products_1.length > 0) setCatProducts1(data.cat_products_1);
         if (data?.cat_products_2 && data.cat_products_2.length > 0) setCatProducts2(data.cat_products_2);
         if (data?.cat_products_3 && data.cat_products_3.length > 0) setCatProducts3(data.cat_products_3);
+
+        if (data?.video_ai_script) setAiScript(data.video_ai_script);
       })
       .catch((err) => console.error("讀取網站動態設定失敗:", err));
   }, []);
@@ -309,19 +313,7 @@ export default function HomePage() {
                   }
 
                   return (
-                    <video
-                      key={sitePromoVideo}
-                      src={sitePromoVideo}
-                      poster={sitePromoPoster || undefined}
-                      preload="metadata"
-                      controls
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      onLoadedMetadata={(e) => setIsVerticalVideo(e.currentTarget.videoHeight > e.currentTarget.videoWidth)}
-                      className={videoClass}
-                    />
+                    <AiVideoPlayer videoUrl={sitePromoVideo} aiScript={aiScript} poster={sitePromoPoster || undefined} />
                   );
                 }
               })()}
