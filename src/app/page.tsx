@@ -327,7 +327,7 @@ export default function HomePage() {
               Categories & Selection.
             </h2>
             <p className="text-[#78C4EC] font-bold text-sm tracking-widest uppercase bg-[#bbe3f8] hover:bg-[#a8d0f0] inline-block px-4 py-1.5 rounded-full">
-              ユキ&トモヤ 八大日本嚴選代購品類
+              ユキ&トモヤ 三大日本嚴選代購專區
             </p>
           </div>
 
@@ -434,7 +434,7 @@ export default function HomePage() {
             <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
             <span className="w-1.5 h-1.5 rounded-full bg-[#E2B857]"></span>
           </div>
-          <span className="text-[10px] font-bold tracking-wide mt-0.5">八大嚴選分類</span>
+          <span className="text-[10px] font-bold tracking-wide mt-0.5">三大嚴選分類</span>
         </a>
         <a
           href="#video"
