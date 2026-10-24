@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,16 +8,27 @@ export default function HomePage() {
   const [contactOpen, setContactOpen] = useState(false);
 
   // 動態綁定 Redis 的網站主標題、頂部公告與連結
-  const [siteTitle, setSiteTitle] = useState("");
-  const [siteAnnouncement, setSiteAnnouncement] = useState("");
+  const [siteTitle, setSiteTitle] = useState("日本職人好物・安心直送台灣");
+  const [siteAnnouncement, setSiteAnnouncement] = useState("✈️ ユキ&トモヤ 日本現地連線代購中！運動裝備・文具教材・保健益生菌・日本直送");
   const [siteAnnouncementUrl, setSiteAnnouncementUrl] = useState("");
 
   // 動態綁定網站主視覺背景
-  const [siteHeroImage, setSiteHeroImage] = useState("https://images.unsplash.com/photo-1534778101976-62847782c213?q=80&w=1600&auto=format&fit=crop");
+  const [siteHeroImage, setSiteHeroImage] = useState("https://images.unsplash.com/photo-1542051842830-0c984bc27546?q=80&w=1600&auto=format&fit=crop"); // 東京街景
 
   // 動態綁定影片區塊
   const [sitePromoVideo, setSitePromoVideo] = useState("https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-large.mp4");
-  const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ 職人精神 × 少棒熱血應援");
+  const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ ユキ&トモヤ 日本現場連線實拍");
+
+  // 分類圖片
+  const [catImg1, setCatImg1] = useState("https://images.unsplash.com/photo-1508344928928-7165b67de128?q=80&w=800&auto=format&fit=crop"); // 運動
+  const [catImg2, setCatImg2] = useState("https://images.unsplash.com/photo-1568205612837-017257d2310a?q=80&w=800&auto=format&fit=crop"); // 文具
+  const [catImg3, setCatImg3] = useState("https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=800&auto=format&fit=crop"); // 保健
+  const [catImg4, setCatImg4] = useState("https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=800&auto=format&fit=crop"); // 日常
+  const [catImg5, setCatImg5] = useState("https://images.unsplash.com/photo-1599599810694-b5b37304c041?q=80&w=800&auto=format&fit=crop"); // 零食
+  const [catImg6, setCatImg6] = useState("https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=800&auto=format&fit=crop"); // 服飾
+  const [catImg7, setCatImg7] = useState("https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=800&auto=format&fit=crop"); // 精品
+  const [catImg8, setCatImg8] = useState("https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=800&auto=format&fit=crop"); // 文創
+
   const [isVerticalVideo, setIsVerticalVideo] = useState(false);
 
   // 截圖與封面圖模式支援
@@ -71,22 +83,33 @@ export default function HomePage() {
         if (data?.site_promo_orientation && !liveOrientation) {
           setIsVerticalVideo(data.site_promo_orientation === "vertical");
         }
+        if (data?.cat_img_1) setCatImg1(data.cat_img_1);
+        if (data?.cat_img_2) setCatImg2(data.cat_img_2);
+        if (data?.cat_img_3) setCatImg3(data.cat_img_3);
+        if (data?.cat_img_4) setCatImg4(data.cat_img_4);
+        if (data?.cat_img_5) setCatImg5(data.cat_img_5);
+        if (data?.cat_img_6) setCatImg6(data.cat_img_6);
+        if (data?.cat_img_7) setCatImg7(data.cat_img_7);
+        if (data?.cat_img_8) setCatImg8(data.cat_img_8);
       })
       .catch((err) => console.error("讀取網站動態設定失敗:", err));
   }, []);
 
-  // 直接鎖定您在 LINE 指定的 4 大最新服務項目
-  const services = [
-    { title: "極致職人手沖咖啡", desc: "嚴選莊園單品，極致日式手沖工藝。", tag: "COFFEE", img: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=800&auto=format&fit=crop" },
-    { title: "職人裝備嚴選", desc: "日規打擊配重與高規格球具體驗。", tag: "EQUIPMENT", img: "https://images.unsplash.com/photo-1508344928928-7165b67de128?q=80&w=800&auto=format&fit=crop" },
-    { title: "專業訓練課程", desc: "為運動員與品味人士特調的機能補給與訓練。", tag: "TRAINING", img: "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?q=80&w=800&auto=format&fit=crop" },
-    { title: "台日國際交流", desc: "結合仙台草野塾與台灣少棒的深度交流。", tag: "EXCHANGE", img: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?q=80&w=800&auto=format&fit=crop" },
+  // 八大日本代購嚴選專區
+  const categories = [
+    { id: 1, title: "日本運動用品嚴選", desc: "棒壘球實戰裝備（日規手套、球棒、打擊配件）及其他專業運動護具用品。", tag: "SPORTS", img: catImg1 },
+    { id: 2, title: "日本文具與教材用品", desc: "日本益智教材、KOKUYO、Pilot、三菱 Uni 等日本大賞機能文具與學用品。", tag: "STATIONERY", img: catImg2 },
+    { id: 3, title: "日本營養保健＆益生菌", desc: "符合進出口規範之日本大廠保健食品、家庭常備機能益生菌與日常營養補給。", tag: "HEALTH", img: catImg3 },
+    { id: 4, title: "日本日常生活＆電器商品", desc: "日本空間芳香劑、高階充電電池、人氣居家實用小家電與日用品。", tag: "DAILY & TECH", img: catImg4 },
+    { id: 5, title: "日本熱門零食＆飲品", desc: "日本各地人氣餅乾、季節限定糖果、伴手禮盒與精選沖泡飲品。", tag: "SNACKS", img: catImg5 },
+    { id: 6, title: "日本休閒服飾（男／女／童）", desc: "日系機能與日常百搭服飾，涵蓋男裝、女裝與舒適耐穿的兒童穿搭。", tag: "APPAREL", img: catImg6 },
+    { id: 7, title: "日本精品＆質感鍋碗餐具", desc: "日本平價輕奢飾品、美濃燒／有田燒精緻鍋碗盤餐具與廚房美學器皿。", tag: "BOUTIQUE", img: catImg7 },
+    { id: 8, title: "日本文創＆特殊創意商品", desc: "日本各地限定文創小物、特色設計雜貨與精美創意禮品。", tag: "CREATIVE", img: catImg8 },
   ];
 
-  const pureGoldStyle = "bg-[#C8A97E] hover:bg-[#B89868] text-white shadow-md";
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-stone-800 flex flex-col font-sans relative pb-16 md:pb-0">
+    <div className="min-h-screen bg-white text-[#1A1A1A] flex flex-col font-sans relative pb-16 md:pb-0">
       <style>{`
         @keyframes marqueeSlide {
           0% { transform: translateX(45%); }
@@ -101,59 +124,60 @@ export default function HomePage() {
       `}</style>
 
       {/* 1. 頂部公告欄（動態顯示 Redis 公告與連結） */}
-      <aside className="bg-[#6B1D2F] text-white text-xs sm:text-sm py-2 px-4 text-center overflow-hidden">
+      <aside className="bg-[#78C4EC] text-white text-xs sm:text-sm py-2 px-4 text-center overflow-hidden shadow-sm relative z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 overflow-hidden">
-          <span className="w-2 h-2 rounded-full bg-[#F5A623] shrink-0" />
           <a
-            href={siteAnnouncementUrl}
+            href={siteAnnouncementUrl || "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium tracking-wide inline-block animate-pulse"
+            className={`font-medium tracking-wide inline-block ${siteAnnouncementUrl ? 'animate-pulse' : ''}`}
           >
             <span>{siteAnnouncement}</span>
-            <span className="ml-2 text-[#F3D299] underline underline-offset-4">
-              點擊進入直播 ↗
-            </span>
+            {siteAnnouncementUrl && (
+              <span className="ml-2 text-[#E5F3FC] underline underline-offset-4">
+                點擊查看詳情 ↗
+              </span>
+            )}
           </a>
         </div>
       </aside>
 
       {/* 2. 頂部導覽列 */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-50 px-6 sm:px-10 py-4 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b border-[#E5F3FC] sticky top-0 z-40 px-6 sm:px-10 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#6B1D2F] flex items-center justify-center font-bold text-white text-base shadow-sm">
-            S
+          <div className="w-10 h-10 rounded-full bg-[#78C4EC] flex items-center justify-center font-bold text-white text-lg shadow-sm border-2 border-white">
+            Y&T
           </div>
-          <span className="font-extrabold tracking-[0.2em] text-xl text-[#6B1D2F]">
-            SPORT CAFÉ
-          </span>
+          <div className="flex flex-col">
+            <span className="font-bold tracking-widest text-lg text-[#1A1A1A]">
+              ユキ&トモヤ
+            </span>
+            <span className="text-[9px] text-stone-400 tracking-wider">YUKI & TOMOYA JAPAN SELECT</span>
+          </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-7 text-[13px] font-medium text-stone-700 tracking-wider">
-          <a href="#about" className="hover:text-[#6B1D2F] transition">關於本所</a>
-          <a href="#services" className="hover:text-[#6B1D2F] transition">服務項目</a>
-          <a href="#experts" className="hover:text-[#6B1D2F] transition">職人專欄</a>
-          <a href="#sharing" className="hover:text-[#6B1D2F] transition">美麗見證</a>
-          <a href="#gear" className="hover:text-[#6B1D2F] transition">裝備專區</a>
-          <a href="#prices" className="hover:text-[#6B1D2F] transition">參考價目表</a>
-          <a href="#stores" className="hover:text-[#6B1D2F] transition">診所據點</a>
-          <a href="#contact" className="hover:text-[#6B1D2F] transition">線上客服</a>
+        <nav className="hidden lg:flex items-center gap-7 text-[13px] font-medium text-stone-600 tracking-wider">
+          <a href="#about" className="hover:text-[#78C4EC] transition">代購流程</a>
+          <a href="#categories" className="hover:text-[#78C4EC] transition">嚴選品類</a>
+          <a href="#video" className="hover:text-[#78C4EC] transition">日本現場實拍</a>
+          <a href="#contact" className="hover:text-[#78C4EC] transition">客服諮詢</a>
         </nav>
 
-        <div className="flex items-center gap-5">
-          <button aria-label="搜尋" className="text-stone-800 hover:text-[#6B1D2F] transition">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.2-5.2m0 0A7.5 7.5 0 105.2 5.2a7.5 7.5 0 0010.6 10.6z" />
+        <div className="flex items-center gap-4">
+          <button className="hidden sm:flex items-center gap-1 text-xs font-bold text-[#78C4EC] bg-[#E5F3FC] px-3 py-1.5 rounded-full hover:bg-[#78C4EC] hover:text-white transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
+            許願代購
           </button>
           
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="選單"
-            className="text-stone-800 hover:text-[#6B1D2F] transition p-1"
+            className="text-[#78C4EC] transition p-1"
           >
             {menuOpen ? (
-              <svg className="w-7 h-7 text-[#6B1D2F]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
@@ -165,26 +189,23 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* 3. 全螢幕漢堡分類選單 */}
+            {/* 3. 全螢幕漢堡分類選單 */}
       {menuOpen && (
         <div className="fixed inset-0 top-[110px] bg-white z-40 overflow-y-auto px-6 py-8 shadow-2xl">
-          <div className="max-w-md mx-auto bg-[#6B1D2F] text-white py-3 px-6 rounded-lg font-medium text-sm mb-6 shadow-sm">
-            WBEAUTY · SPORT CAFÉ 專屬選單
+          <div className="max-w-md mx-auto bg-[#78C4EC] text-white py-3 px-6 rounded-xl font-medium text-sm mb-6 shadow-sm">
+            YUKI & TOMOYA 專屬選單
           </div>
-          <div className="max-w-md mx-auto divide-y divide-stone-100 text-stone-800 text-base font-medium">
+          <div className="max-w-md mx-auto divide-y divide-[#E5F3FC] text-[#1A1A1A] text-base font-medium">
             {[
-              { title: "關於本所", items: ["品牌初心", "創辦理念", "環境導覽"] },
-              { title: "服務項目", items: ["精品手沖咖啡", "匠心嚴選裝備", "專業訓練課程", "台日國際交流"] },
-              { title: "職人專欄", items: ["教練專訪", "裝備評測心得"] },
-              { title: "美麗見證", items: ["學員實績分享", "活動花絮"] },
-              { title: "參考價目表", items: ["咖啡飲品價目", "裝備借測方案"] },
-              { title: "診所據點", items: ["台北信義館", "新竹竹北館"] },
-              { title: "線上客服", items: ["專人 LINE 諮詢", "來電預約專線"] },
+              { title: "代購流程", items: ["如何許願", "費用計算", "國際運送"] },
+              { title: "八大日本嚴選代購品類", items: ["SPORTS 運動用品", "STATIONERY 文具教材", "HEALTH 保健益生菌", "DAILY 日常電器", "SNACKS 零食飲品", "APPAREL 服飾穿搭", "BOUTIQUE 精品餐具", "CREATIVE 文創設計"] },
+              { title: "日本現場實拍", items: ["連線動態", "職人實地採購"] },
+              { title: "線上客服", items: ["專人 LINE 諮詢"] },
             ].map((section, idx) => (
               <div key={idx} className="py-4 flex flex-col gap-2">
-                <div className="flex items-center justify-between cursor-pointer hover:text-[#6B1D2F]">
+                <div className="flex items-center justify-between cursor-pointer hover:text-[#78C4EC]">
                   <span>{section.title}</span>
-                  <span className="text-xl font-light text-[#6B1D2F]">+</span>
+                  <span className="text-xl font-light text-[#78C4EC]">+</span>
                 </div>
               </div>
             ))}
@@ -194,8 +215,11 @@ export default function HomePage() {
 
       {/* 4. Hero 主視覺（動態顯示 Redis 主標題） */}
       <main className="flex-1">
+        <div className="bg-[#78C4EC] text-white text-center pb-4 pt-1 relative">
+          <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[16px] border-t-[#78C4EC] z-30"></div>
+        </div>
         <section
-          className="relative h-[520px] sm:h-[600px] flex flex-col justify-end transition-all duration-700 overflow-hidden bg-[#181514]"
+          className="relative h-[520px] sm:h-[600px] flex flex-col justify-center items-center text-center transition-all duration-700 overflow-hidden bg-[#F2F2F2]"
         >
           {siteHeroImage?.match(/\.(mp4|webm)(\?.*)?$/i) ? (
             <video src={siteHeroImage} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-0" />
@@ -203,26 +227,27 @@ export default function HomePage() {
             <img src={siteHeroImage} alt="Hero Background" className="absolute inset-0 w-full h-full object-cover z-0" />
           )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 z-10" />
+          <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px] z-10" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-[#1A1A1A]/70 z-10" />
 
-          <div className="relative z-20 max-w-7xl w-full mx-auto px-8 pb-16">
-            <div className={`inline-block px-4 py-1.5 mb-3 rounded-full text-xs font-bold tracking-[0.25em] uppercase ${pureGoldStyle}`}>
-              ✦ SPORT CAFÉ EXCLUSIVE ✦
+          <div className="relative z-20 max-w-4xl w-full mx-auto px-6 flex flex-col items-center mt-32">
+            <div className="inline-block px-5 py-2 mb-4 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase bg-[#78C4EC] text-white shadow-md">
+              + YUKI & TOMOYA JAPAN DIRECT +
             </div>
-            <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white mb-4 leading-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight drop-shadow-md">
               {siteTitle}
             </h1>
-            <p className="text-stone-200 text-sm sm:text-base max-w-xl mb-6 font-light leading-relaxed tracking-wide">
-              結合日式極致手沖工藝與專業裝備借測。300天職人匠心淬鍊・專注升級的現代複合空間。
+            <p className="text-white text-sm sm:text-base max-w-2xl font-medium leading-relaxed tracking-wide drop-shadow">
+              嚴選日本棒壘運動裝備、公文教材文具、家庭保健益生菌與日本質感生活百貨。
             </p>
           </div>
         </section>
 
         {/* 宣傳影片區塊 */}
         {sitePromoVideo !== "hidden" && (
-          <section className="bg-[#181514] py-16 px-6">
+          <section id="video" className="bg-[#EBF6FC] py-16 px-6 border-b border-[#E5F3FC]">
             <div className="max-w-5xl mx-auto flex flex-col items-center">
-              <div className="inline-block px-3 py-1 mb-4 rounded-full text-[10px] font-bold tracking-widest text-[#C8A97E] border border-[#C8A97E]/40 uppercase">
+              <div className="inline-block px-4 py-1.5 mb-6 rounded-full text-[11px] font-bold tracking-widest text-[#78C4EC] bg-white border border-[#78C4EC]/30 uppercase shadow-sm">
                 {sitePromoVideoTitle}
               </div>
 
@@ -245,8 +270,8 @@ export default function HomePage() {
                   );
                 } else {
                   const videoClass = isVerticalVideo
-                    ? "max-w-[360px] w-full mx-auto aspect-[9/16] object-contain bg-black rounded-2xl shadow-2xl border border-[#C8A97E]/30"
-                    : "w-full max-w-4xl mx-auto aspect-video object-contain bg-black rounded-2xl shadow-2xl border border-[#C8A97E]/30";
+                    ? "max-w-[360px] w-full mx-auto aspect-[9/16] object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#78C4EC]/40"
+                    : "w-full max-w-4xl mx-auto aspect-video object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#78C4EC]/40";
 
                   if (isScreenshotMode && sitePromoPoster) {
                     const screenshotContainerClass = isVerticalVideo
@@ -259,10 +284,10 @@ export default function HomePage() {
                           src={sitePromoPoster}
                           alt="Video Poster"
                           onLoad={(e) => setIsVerticalVideo(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)}
-                          className="w-full h-auto block rounded-2xl shadow-2xl border border-[#C8A97E]/30"
+                          className="w-full h-auto block rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#78C4EC]/40"
                         />
-                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center rounded-2xl">
-                          <div className="w-16 h-16 bg-[#C8A97E]/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50 shadow-lg">
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center rounded-2xl m-1">
+                          <div className="w-16 h-16 bg-[#78C4EC]/80 backdrop-blur-md rounded-full flex items-center justify-center border border-white/80 shadow-lg">
                             <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-2"></div>
                           </div>
                         </div>
@@ -291,32 +316,44 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* 服務項目清單（已完美更新為 4 個項目） */}
-        <section id="services" className="bg-[#FAF7F2] max-w-7xl mx-auto px-8 pt-16 pb-12">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-serif font-bold tracking-wide text-[#6B1D2F] mb-2">
-              Services & Experience.
+        {/* 八大日本代購嚴選專區 */}
+        <section id="categories" className="bg-white max-w-7xl mx-auto px-6 sm:px-8 pt-20 pb-16">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-wide text-[#1A1A1A] mb-3">
+              Categories & Selection.
             </h2>
-            <p className="text-stone-500 text-xs sm:text-sm tracking-widest uppercase">
-              頂級工藝與專業運動空間配置
+            <p className="text-[#78C4EC] font-bold text-sm tracking-widest uppercase bg-[#E5F3FC] inline-block px-4 py-1.5 rounded-full">
+              ユキ&トモヤ 八大日本嚴選代購品類
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {services.map((item, idx) => (
-              <div key={idx} className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition border border-stone-100 flex flex-col group cursor-pointer">
-                <div className="h-48 overflow-hidden relative">
-                  <div className="absolute top-3 left-3 z-10 px-3 py-1 rounded-full bg-[#FAF7F2]/90 backdrop-blur text-[10px] font-bold text-[#6B1D2F] tracking-widest">
-                    {item.tag}
+            {categories.map((item) => (
+              <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-[#E5F3FC] flex flex-col group cursor-pointer">
+                <div className="h-52 overflow-hidden relative bg-[#F2F2F2]">
+                  <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5">
+                    <div className="w-7 h-7 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-xs font-extrabold text-[#78C4EC] shadow-sm border border-[#E5F3FC]">
+                      {item.id}.
+                    </div>
+                    <div className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold text-[#1A1A1A] tracking-wider shadow-sm">
+                      {item.tag}
+                    </div>
                   </div>
-                  <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                  <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
                 </div>
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-stone-900 mb-2">{item.title}</h3>
-                    <p className="text-xs text-stone-500 leading-relaxed">{item.desc}</p>
+                <div className="p-6 flex-1 flex flex-col justify-between bg-white relative">
+                  <div className="absolute -top-6 right-6 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md z-20 group-hover:-translate-y-1 transition border border-[#E5F3FC]">
+                    <svg className="w-5 h-5 text-[#78C4EC]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
                   </div>
-                  <div className="mt-6 flex items-center text-xs font-bold text-[#6B1D2F]">了解更多 ➔</div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#1A1A1A] mb-2.5 leading-snug">{item.title}</h3>
+                    <p className="text-[13px] text-stone-500 leading-relaxed font-medium">{item.desc}</p>
+                  </div>
+                  <div className="mt-6 flex items-center justify-between">
+                    <span className="text-[13px] font-bold text-[#78C4EC] group-hover:text-[#56A8D6] transition">LINE 傳圖詢價 →</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -324,102 +361,115 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* 5. 頂級 Footer */}
-      <footer id="stores" className="bg-[#EFEAE4] border-t border-stone-300 text-stone-800 py-12 px-6 sm:px-12 mt-16">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+      {/* 5. 底部 Footer */}
+      <footer className="bg-[#EBF6FC] border-t border-[#E5F3FC] text-[#1A1A1A] py-12 px-6 sm:px-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-[#6B1D2F] flex items-center justify-center font-bold text-white text-sm">
-                S
+              <div className="w-10 h-10 rounded-full bg-[#78C4EC] flex items-center justify-center font-bold text-white text-lg shadow-sm border-2 border-white">
+                Y&T
               </div>
-              <span className="font-bold tracking-widest text-lg text-[#6B1D2F]">
-                SPORT CAFÉ
+              <span className="font-bold tracking-widest text-lg text-[#1A1A1A]">
+                ユキ&トモヤ
               </span>
             </div>
-            <p className="text-[11px] text-stone-500 leading-relaxed mb-6">
-              ※任何訓練均有其風險，本網站圖文僅供參考，實際狀況須由專業教練進行評估指導而定。
+            <p className="text-[12px] text-stone-500 leading-relaxed">
+              YUKI & TOMOYA JAPAN SELECT<br/>
+              專營日本最新人氣商品、限定品代購與現地連線。<br/>
+              日本境內直達，安全安心。
             </p>
           </div>
 
-          <div>
-            <div className="font-bold text-stone-900 text-sm mb-4 tracking-wider text-[#6B1D2F]">診所據點</div>
-            <div className="space-y-4 text-xs text-stone-600">
-              <div>
-                <div className="font-bold text-stone-800 mb-0.5">台北南京館</div>
-                <div>📍 台北市南京東路三段331號2樓</div>
-                <div className="text-[#6B1D2F]">📞 02-77074669</div>
+          <div id="contact">
+            <div className="font-bold text-[#78C4EC] text-sm mb-4 tracking-wider">聯絡我們</div>
+            <div className="space-y-3 text-sm text-stone-600 font-medium">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                LINE 官方帳號：@yuki_tomoya
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#78C4EC]"></span>
+                客服時間：10:00 - 20:00 (JST)
               </div>
             </div>
           </div>
 
-          <div id="contact">
-            <div className="font-bold text-stone-900 text-sm mb-4 tracking-wider text-[#6B1D2F]">聯絡我們</div>
-            <div className="text-xs text-stone-500 mb-1">諮詢專線</div>
-            <div className="text-xl font-serif font-bold text-[#6B1D2F] mb-4">02-77074669</div>
-          </div>
-
           <div>
-            <div className="font-bold text-stone-900 text-sm mb-4 tracking-wider text-[#6B1D2F]">快速連結</div>
-            <ul className="space-y-2 text-xs text-stone-600">
-              <li><a href="#services" className="hover:text-[#6B1D2F] transition">服務項目</a></li>
-              <li><a href="#stores" className="hover:text-[#6B1D2F] transition">門診時間</a></li>
+            <div className="font-bold text-[#78C4EC] text-sm mb-4 tracking-wider">快速導覽</div>
+            <ul className="space-y-2 text-sm text-stone-600 font-medium">
+              <li><a href="#categories" className="hover:text-[#78C4EC] transition">嚴選品類</a></li>
+              <li><a href="#video" className="hover:text-[#78C4EC] transition">現場實拍</a></li>
             </ul>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto border-t border-stone-300/60 pt-6 text-center text-xs text-stone-500">
-          <p>Copyright © 2026 SPORT CAFÉ GROUP. All rights reserved.</p>
+        <div className="max-w-7xl mx-auto border-t border-[#78C4EC]/20 pt-6 text-center text-[11px] text-stone-500 font-medium tracking-wide">
+          <p>Copyright © 2026 YUKI & TOMOYA JAPAN SELECT. All rights reserved.</p>
         </div>
       </footer>
 
-      {/* 6. 手機底部固定導覽列（純金風格） */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 h-[52px] bg-[#C8A97E] border-t border-stone-200 flex items-stretch shadow-lg md:hidden">
+      {/* 6. 底部固定四格導覽列（KUMON 風格） */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 h-[56px] bg-[#E5F3FC] border-t border-[#78C4EC]/30 flex items-stretch shadow-[0_-4px_10px_rgba(0,0,0,0.03)] pb-safe md:hidden">
         <a
           href="https://line.me"
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex-1 flex items-center justify-center gap-1 text-xs font-bold tracking-wider border-r border-white/20 ${pureGoldStyle}`}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#1A1A1A] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
         >
-          <span>💬 LINE 台北</span>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          </div>
+          <span className="text-[10px] font-bold tracking-wide mt-0.5">LINE 許願代購</span>
         </a>
         <a
-          href="https://line.me"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`flex-1 flex items-center justify-center gap-1 text-xs font-bold tracking-wider border-r border-white/20 ${pureGoldStyle}`}
+          href="#categories"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#1A1A1A] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
         >
-          <span>💬 LINE 仙台</span>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#E2B857]"></span>
+          </div>
+          <span className="text-[10px] font-bold tracking-wide mt-0.5">八大嚴選分類</span>
         </a>
         <a
-          href="tel:0227000000"
-          className={`flex-1 flex items-center justify-center gap-1 text-xs font-bold tracking-wider border-r border-white/20 ${pureGoldStyle}`}
+          href="#video"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#1A1A1A] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
         >
-          <span>📞 來電諮詢</span>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F29B9B]"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
+          </div>
+          <span className="text-[10px] font-bold tracking-wide mt-0.5">日本連線影片</span>
         </a>
         <button
           onClick={() => setContactOpen(!contactOpen)}
           aria-label="展開"
-          className={`w-14 flex items-center justify-center text-xl font-bold ${pureGoldStyle}`}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#1A1A1A] hover:bg-[#78C4EC]/10 transition"
         >
-          {contactOpen ? "✕" : "＋"}
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#E2B857]"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F29B9B]"></span>
+          </div>
+          <span className="text-[10px] font-bold tracking-wide mt-0.5">聯絡客服諮詢</span>
         </button>
       </nav>
 
       {/* 7. 右下角彈出選單 */}
       {contactOpen && (
-        <div className="fixed bottom-[60px] right-3 z-50 bg-white rounded-2xl shadow-2xl border border-stone-200 p-4 w-[270px]">
-          <div className="text-xs font-bold text-[#6B1D2F] mb-3 pb-2 border-b border-stone-100 flex items-center justify-between">
-            <span>快速聯絡與據點</span>
-            <span className="cursor-pointer text-stone-400" onClick={() => setContactOpen(false)}>✕</span>
+        <div className="fixed bottom-[70px] right-3 z-50 bg-white rounded-2xl shadow-xl border border-[#E5F3FC] p-4 w-[240px]">
+          <div className="text-xs font-bold text-[#78C4EC] mb-3 pb-2 border-b border-[#E5F3FC] flex items-center justify-between">
+            <span>聯絡客服</span>
+            <span className="cursor-pointer text-stone-400 hover:text-stone-600 text-sm" onClick={() => setContactOpen(false)}>✕</span>
           </div>
           <div className="flex flex-col gap-2.5 text-xs">
-            <a href="https://line.me" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-stone-50 text-stone-700 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span>LINE 台北館</span>
+            <a href="https://line.me" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-[#EBF6FC] text-stone-700 font-medium transition">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
+              <span>LINE 官方客服</span>
             </a>
-            <a href="tel:0227000000" className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-stone-50 text-stone-700 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#6B1D2F]" />
-              <span>諮詢專線 02-77074669</span>
+            <a href="#about" onClick={() => setContactOpen(false)} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-[#EBF6FC] text-stone-700 font-medium transition">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#78C4EC] shadow-sm" />
+              <span>查看代購流程說明</span>
             </a>
           </div>
         </div>

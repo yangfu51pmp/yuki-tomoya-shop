@@ -66,9 +66,28 @@ export async function GET(req: NextRequest) {
     const client = createClient({ url: REDIS_URL });
     await client.connect();
 
+
+    const catImgId = req.nextUrl.searchParams.get("cat_img");
+    if (catImgId) {
+      const b64 = await client.get(`yt_cat_img_${catImgId}_b64`);
+      const mime = await client.get(`yt_cat_img_${catImgId}_mime`) || "image/jpeg";
+      await client.quit();
+
+      if (b64) {
+        const buffer = Buffer.from(b64, "base64");
+        return new NextResponse(buffer, {
+          headers: {
+            "Content-Type": mime,
+            "Cache-Control": "public, max-age=86400",
+          },
+        });
+      }
+      return new NextResponse("Not Found", { status: 404 });
+    }
+
     if (req.nextUrl.searchParams.get("hero_img") === "1") {
-      const b64 = await client.get("site_hero_image_b64");
-      const mime = await client.get("site_hero_image_mime") || "image/png";
+      const b64 = await client.get("yt_site_hero_image_b64");
+      const mime = await client.get("yt_site_hero_image_mime") || "image/png";
       await client.quit();
 
       if (b64) {
@@ -84,7 +103,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (req.nextUrl.searchParams.get("promo_poster") === "1") {
-      const b64 = await client.get("site_promo_poster_b64");
+      const b64 = await client.get("yt_site_promo_poster_b64");
       await client.quit();
 
       if (b64) {
@@ -99,15 +118,23 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Not Found", { status: 404 });
     }
 
-    const [site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation] = await Promise.all([
-      client.get("site_title"),
-      client.get("site_announcement"),
-      client.get("site_announcement_url"),
-      client.get("site_hero_image"),
-      client.get("site_promo_video"),
-      client.get("site_promo_video_title"),
-      client.get("site_promo_poster"),
-      client.get("site_promo_orientation"),
+    const [site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation, cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8] = await Promise.all([
+      client.get("yt_site_title"),
+      client.get("yt_site_announcement"),
+      client.get("yt_site_announcement_url"),
+      client.get("yt_site_hero_image"),
+      client.get("yt_site_promo_video"),
+      client.get("yt_site_promo_video_title"),
+      client.get("yt_site_promo_poster"),
+      client.get("yt_site_promo_orientation"),
+      client.get("yt_cat_img_1"),
+      client.get("yt_cat_img_2"),
+      client.get("yt_cat_img_3"),
+      client.get("yt_cat_img_4"),
+      client.get("yt_cat_img_5"),
+      client.get("yt_cat_img_6"),
+      client.get("yt_cat_img_7"),
+      client.get("yt_cat_img_8"),
     ]);
     await client.quit();
 
@@ -121,6 +148,14 @@ export async function GET(req: NextRequest) {
         site_promo_video_title: site_promo_video_title || "",
         site_promo_poster: site_promo_poster || "",
         site_promo_orientation: site_promo_orientation || "",
+        cat_img_1: cat_img_1 || "",
+        cat_img_2: cat_img_2 || "",
+        cat_img_3: cat_img_3 || "",
+        cat_img_4: cat_img_4 || "",
+        cat_img_5: cat_img_5 || "",
+        cat_img_6: cat_img_6 || "",
+        cat_img_7: cat_img_7 || "",
+        cat_img_8: cat_img_8 || "",
       },
       {
         headers: {
@@ -209,7 +244,7 @@ async function replyLine(replyToken: string, text: string, imageUrl?: string | n
 }
 
 // 雲端無人瀏覽器即時截圖（自動帶入 Redis 最新標題與公告，確保截圖 100% 零延遲）
-async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?: string, overrideBg?: string, overrideVideo?: string, overrideVideoTitle?: string): Promise<string | null> {
+async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?: string, overrideBg?: string, overrideVideo?: string, overrideVideoTitle?: string, height: number = 1950): Promise<string | null> {
   try {
     let title = overrideTitle || "";
     let notice = overrideNotice || "";
@@ -223,13 +258,13 @@ async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?:
       try {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        if (!title) title = (await client.get("site_title")) || "";
-        if (!notice) notice = (await client.get("site_announcement")) || "";
-        if (!bg) bg = (await client.get("site_hero_image")) || "";
-        if (!video) video = (await client.get("site_promo_video")) || "";
-        if (!videoTitle) videoTitle = (await client.get("site_promo_video_title")) || "";
-        poster = (await client.get("site_promo_poster")) || "";
-        orientation = (await client.get("site_promo_orientation")) || "";
+        if (!title) title = (await client.get("yt_site_title")) || "";
+        if (!notice) notice = (await client.get("yt_site_announcement")) || "";
+        if (!bg) bg = (await client.get("yt_site_hero_image")) || "";
+        if (!video) video = (await client.get("yt_site_promo_video")) || "";
+        if (!videoTitle) videoTitle = (await client.get("yt_site_promo_video_title")) || "";
+        poster = (await client.get("yt_site_promo_poster")) || "";
+        orientation = (await client.get("yt_site_promo_orientation")) || "";
         await client.quit();
       } catch (e) {
         console.error("Redis read for screenshot error:", e);
@@ -253,7 +288,7 @@ async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?:
     const targetUrl = `https://sports-cafe-hub.vercel.app?${params.toString()}`;
     const screenshotApi = `https://api.microlink.io?url=${encodeURIComponent(
       targetUrl
-    )}&screenshot=true&viewport.isMobile=true&viewport.width=390&viewport.height=1950&force=true`;
+    )}&screenshot=true&viewport.isMobile=true&viewport.width=390&viewport.height=${height}&force=true`;
 
     let data;
     try {
@@ -634,7 +669,7 @@ ${currentContent}`;
     try {
       const redisClient = createClient({ url: REDIS_URL });
       await redisClient.connect();
-      await redisClient.set("site_page_prev_backup", currentContent);
+      await redisClient.set("yt_site_page_prev_backup", currentContent);
       await redisClient.quit();
     } catch (e) {
       console.error("Backup to Redis failed before modifying code:", e);
@@ -682,7 +717,7 @@ export async function POST(req: NextRequest) {
         if (REDIS_URL && LINE_CHANNEL_ACCESS_TOKEN) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
-          const awaitingUpload = await client.get("awaiting_bg_upload");
+          const awaitingUpload = await client.get("yt_awaiting_bg_upload");
 
           if (awaitingUpload === "1") {
             try {
@@ -695,15 +730,15 @@ export async function POST(req: NextRequest) {
                 const b64 = Buffer.from(arrayBuffer).toString("base64");
                 const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
 
-                await client.set("site_hero_image_b64", b64);
-                await client.set("site_hero_image_mime", mimeType);
+                await client.set("yt_site_hero_image_b64", b64);
+                await client.set("yt_site_hero_image_mime", mimeType);
 
                 // Get the current base URL for the background
                 const siteUrl = req.nextUrl.origin;
                 const newBgUrl = `${siteUrl}/api/line?hero_img=1&t=${Date.now()}`;
 
-                await client.set("site_hero_image", newBgUrl);
-                await client.del("awaiting_bg_upload");
+                await client.set("yt_site_hero_image", newBgUrl);
+                await client.del("yt_awaiting_bg_upload");
                 await client.quit();
 
                 try { revalidatePath("/"); } catch {}
@@ -721,6 +756,44 @@ export async function POST(req: NextRequest) {
               console.error("Failed to process image upload:", err);
             }
           }
+
+          const awaitingCatUpload = await client.get("yt_awaiting_cat_upload");
+          if (awaitingCatUpload) {
+            try {
+              const imageRes = await fetch(`https://api-data.line.me/v2/bot/message/${event.message.id}/content`, {
+                headers: { Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}` }
+              });
+
+              if (imageRes.ok) {
+                const arrayBuffer = await imageRes.arrayBuffer();
+                const b64 = Buffer.from(arrayBuffer).toString("base64");
+                const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
+
+                await client.set(`yt_cat_img_${awaitingCatUpload}_b64`, b64);
+                await client.set(`yt_cat_img_${awaitingCatUpload}_mime`, mimeType);
+
+                const siteUrl = req.nextUrl.origin;
+                const newCatUrl = `${siteUrl}/api/line?cat_img=${awaitingCatUpload}&t=${Date.now()}`;
+
+                await client.set(`yt_cat_img_${awaitingCatUpload}`, newCatUrl);
+                await client.del("yt_awaiting_cat_upload");
+                await client.quit();
+
+                try { revalidatePath("/"); } catch {}
+
+                await new Promise((resolve) => setTimeout(resolve, 20000));
+                const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, undefined, undefined, 2400);
+                await replyLine(
+                  replyToken,
+                  `✅ 已成功更新分類 ${awaitingCatUpload} 的專屬圖片！\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+                  screenshot
+                );
+                continue;
+              }
+            } catch (err) {
+              console.error("Failed to process cat image upload:", err);
+            }
+          }
           await client.quit();
         }
         continue;
@@ -731,11 +804,11 @@ export async function POST(req: NextRequest) {
         if (REDIS_URL && LINE_CHANNEL_ACCESS_TOKEN) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
-          const awaitingVideoUpload = await client.get("awaiting_video_upload");
+          const awaitingVideoUpload = await client.get("yt_awaiting_video_upload");
 
           if (awaitingVideoUpload === "1") {
             // 立即刪除以防重複處理
-            await client.del("awaiting_video_upload");
+            await client.del("yt_awaiting_video_upload");
 
             try {
               const videoRes = await fetch(`https://api-data.line.me/v2/bot/message/${event.message.id}/content`, {
@@ -752,7 +825,7 @@ export async function POST(req: NextRequest) {
                   const siteUrl = req.nextUrl.origin;
                   const newVideoUrl = `${siteUrl}/promo.mp4?v=${Date.now()}`;
 
-                  await client.set("site_promo_video", newVideoUrl);
+                  await client.set("yt_site_promo_video", newVideoUrl);
 
                   // Fetch and save video thumbnail
                   try {
@@ -764,10 +837,10 @@ export async function POST(req: NextRequest) {
                       const bufferObj = Buffer.from(previewBuffer);
                       const orientation = getJpegOrientation(bufferObj);
                       const previewB64 = bufferObj.toString("base64");
-                      await client.set("site_promo_poster_b64", previewB64);
+                      await client.set("yt_site_promo_poster_b64", previewB64);
                       const posterUrl = `${siteUrl}/api/line?promo_poster=1&t=${Date.now()}`;
-                      await client.set("site_promo_poster", posterUrl);
-                      await client.set("site_promo_orientation", orientation);
+                      await client.set("yt_site_promo_poster", posterUrl);
+                      await client.set("yt_site_promo_orientation", orientation);
                     }
                   } catch (e) {
                     console.error("Failed to fetch video preview:", e);
@@ -804,7 +877,10 @@ export async function POST(req: NextRequest) {
         rawText.includes("@Sport Cafe") ||
         rawText.includes("@Sport") ||
         rawText.includes("助手") ||
-        rawText.toLowerCase().includes("cafe");
+        rawText.toLowerCase().includes("cafe") ||
+        rawText.includes("@ユキ&トモヤ") ||
+        rawText.includes("@日本代購管理助手") ||
+        rawText.includes("@Sport Cafe 管理助手");
 
       if (isGroupChat && !isCallingBot) {
         continue;
@@ -815,12 +891,12 @@ export async function POST(req: NextRequest) {
         if (REDIS_URL) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
-          const awaitingVideoUpload = await client.get("awaiting_video_upload");
+          const awaitingVideoUpload = await client.get("yt_awaiting_video_upload");
 
           if (awaitingVideoUpload === "1") {
             const newVideoUrl = rawText;
-            await client.set("site_promo_video", newVideoUrl);
-            await client.del("awaiting_video_upload");
+            await client.set("yt_site_promo_video", newVideoUrl);
+            await client.del("yt_awaiting_video_upload");
             await client.quit();
 
             try { revalidatePath("/"); } catch {}
@@ -841,6 +917,8 @@ export async function POST(req: NextRequest) {
       const cleanText = rawText
         .replace(/@Sport\s*Cafe\s*(管理)?助手/gi, "")
         .replace(/@Sport\s*Cafe/gi, "")
+        .replace(/@ユキ&トモヤ/gi, "")
+        .replace(/@日本代購管理助手/gi, "")
         .replace(/@\S+\s*/g, "")
         .replace(/^(Sport\s*Cafe\s*)?(管理)?助手\s*/i, "")
         .replace(/^[「『"“]|["”』」]$/g, "")
@@ -894,7 +972,7 @@ export async function POST(req: NextRequest) {
         if (REDIS_URL) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
-          await client.set("site_announcement_url", targetUrl);
+          await client.set("yt_site_announcement_url", targetUrl);
           await client.quit();
           try { revalidatePath("/"); } catch {}
 
@@ -915,7 +993,7 @@ export async function POST(req: NextRequest) {
         if (directNotice) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
-          await client.set("site_announcement", directNotice);
+          await client.set("yt_site_announcement", directNotice);
           await client.quit();
           try { revalidatePath("/"); } catch {}
 
@@ -936,7 +1014,7 @@ export async function POST(req: NextRequest) {
         if (newTitle) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
-          await client.set("site_title", newTitle);
+          await client.set("yt_site_title", newTitle);
           await client.quit();
           try { revalidatePath("/"); } catch {}
 
@@ -955,7 +1033,7 @@ export async function POST(req: NextRequest) {
       if (bgRestoreMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.del("site_hero_image");
+        await client.del("yt_site_hero_image");
         await client.quit();
         try { revalidatePath("/"); } catch {}
 
@@ -969,12 +1047,40 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // 8.1.4 準備上傳分類圖片
+      const catMatch = cleanText.match(/^(?:更換運動圖片|更換文具圖片|更換保健圖片|更換日常圖片|更換零食圖片|更換服飾圖片|更換精品圖片|更換文創圖片)/);
+      if (catMatch && REDIS_URL) {
+        const catMap: Record<string, string> = {
+          "更換運動圖片": "1",
+          "更換文具圖片": "2",
+          "更換保健圖片": "3",
+          "更換日常圖片": "4",
+          "更換零食圖片": "5",
+          "更換服飾圖片": "6",
+          "更換精品圖片": "7",
+          "更換文創圖片": "8"
+        };
+        const catId = catMap[catMatch[0]];
+        if (catId) {
+          const client = createClient({ url: REDIS_URL });
+          await client.connect();
+          await client.set("yt_awaiting_cat_upload", catId, { EX: 300 });
+          await client.quit();
+
+          await replyLine(
+            replyToken,
+            "請在 5 分鐘內直接傳送該分類的商品照片！"
+          );
+          continue;
+        }
+      }
+
       // 8.1.5 準備上傳背景
       const uploadBgMatch = rawText.match(/@Sport\s*Cafe\s*(管理)?助手\s*上傳背景/) || cleanText.match(/^(?:準備換背景|主題背景更換|更換背景|換背景)/);
       if (uploadBgMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.set("awaiting_bg_upload", "1", { EX: 300 });
+        await client.set("yt_awaiting_bg_upload", "1", { EX: 300 });
         await client.quit();
 
         await replyLine(
@@ -989,7 +1095,7 @@ export async function POST(req: NextRequest) {
       if (uploadVideoMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.set("awaiting_video_upload", "1", { EX: 300 });
+        await client.set("yt_awaiting_video_upload", "1", { EX: 300 });
         await client.quit();
 
         await replyLine(
@@ -1005,7 +1111,7 @@ export async function POST(req: NextRequest) {
         const newVideoUrl = manualVideoMatch[1].trim();
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.set("site_promo_video", newVideoUrl);
+        await client.set("yt_site_promo_video", newVideoUrl);
         await client.quit();
         try { revalidatePath("/"); } catch {}
 
@@ -1024,7 +1130,7 @@ export async function POST(req: NextRequest) {
         const newVideoTitle = titleVideoMatch[1].trim();
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.set("site_promo_video_title", newVideoTitle);
+        await client.set("yt_site_promo_video_title", newVideoTitle);
         await client.quit();
         try { revalidatePath("/"); } catch {}
 
@@ -1042,7 +1148,7 @@ export async function POST(req: NextRequest) {
       if (hideVideoMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.set("site_promo_video", "hidden");
+        await client.set("yt_site_promo_video", "hidden");
         await client.quit();
         try { revalidatePath("/"); } catch {}
 
@@ -1059,7 +1165,7 @@ export async function POST(req: NextRequest) {
       if (showVideoMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.del("site_promo_video");
+        await client.del("yt_site_promo_video");
         await client.quit();
         try { revalidatePath("/"); } catch {}
 
@@ -1098,7 +1204,7 @@ export async function POST(req: NextRequest) {
           if (REDIS_URL) {
             redisClient = createClient({ url: REDIS_URL });
             await redisClient.connect();
-            previousContent = (await redisClient.get("site_page_prev_backup")) || "";
+            previousContent = (await redisClient.get("yt_site_page_prev_backup")) || "";
           }
 
           // 如果 Redis 沒資料，嘗試第二重保障：從 GitHub Commits API 取得前一版
@@ -1148,7 +1254,7 @@ export async function POST(req: NextRequest) {
             if (updateRes.ok) {
               // 恢復成功後，將被覆蓋的版本存入 Redis 備份（交換）
               if (redisClient) {
-                await redisClient.set("site_page_prev_backup", currContent);
+                await redisClient.set("yt_site_page_prev_backup", currContent);
                 await redisClient.quit();
               }
 
@@ -1170,7 +1276,7 @@ export async function POST(req: NextRequest) {
              await replyLine(replyToken, '【Sport Cafe 管理助手】恢復失敗：找不到前一版的歷史紀錄。');
              continue;
           }
-        } catch(e) {
+        } catch {
            await replyLine(replyToken, '【Sport Cafe 管理助手】恢復失敗：發生系統例外錯誤。');
            continue;
         }
@@ -1180,7 +1286,7 @@ export async function POST(req: NextRequest) {
         const newBgUrl = manualBgMatch[1].trim();
         const client = createClient({ url: REDIS_URL });
         await client.connect();
-        await client.set("site_hero_image", newBgUrl);
+        await client.set("yt_site_hero_image", newBgUrl);
         await client.quit();
         try { revalidatePath("/"); } catch {}
 
@@ -1261,10 +1367,10 @@ export async function POST(req: NextRequest) {
         let newBgUrl = "";
 
         if (isSuccess && finalBase64) {
-          await client.set("site_hero_image_b64", finalBase64);
-          await client.set("site_hero_image_mime", finalMime);
+          await client.set("yt_site_hero_image_b64", finalBase64);
+          await client.set("yt_site_hero_image_mime", finalMime);
           newBgUrl = `${req.nextUrl.origin}/api/line?hero_img=1&t=${Date.now()}`;
-          await client.set("site_hero_image", newBgUrl);
+          await client.set("yt_site_hero_image", newBgUrl);
         } else {
           // 【高質感真實攝影備援】
           const fallbackUrls = [
@@ -1302,7 +1408,7 @@ export async function POST(req: NextRequest) {
           }
 
           newBgUrl = bestUrl;
-          await client.set("site_hero_image", newBgUrl);
+          await client.set("yt_site_hero_image", newBgUrl);
         }
 
         await client.quit();
