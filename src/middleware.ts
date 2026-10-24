@@ -4,6 +4,14 @@ import type { NextRequest } from "next/server";
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
+  if (
+    req.nextUrl.searchParams.get("screenshot") === "true" ||
+    req.url.includes("screenshot=true") ||
+    (req.headers.get("user-agent") && (req.headers.get("user-agent")!.includes("Microlink") || req.headers.get("user-agent")!.includes("HeadlessChrome")))
+  ) {
+    return NextResponse.next();
+  }
+
   // 1. 排除 LINE Webhook 與 Next.js 內部靜態資源
   if (
     pathname.startsWith("/api/line") ||
