@@ -274,7 +274,7 @@ async function replyLine(replyToken: string, text: string, imageUrl?: string | n
     }
   }
 
-  const sendMessages = async (msgs: any[], push: boolean) => {
+  const sendMessages = async (msgs: unknown[], push: boolean) => {
     const endpoint = push && targetId
       ? "https://api.line.me/v2/bot/message/push"
       : "https://api.line.me/v2/bot/message/reply";
@@ -415,6 +415,44 @@ function applyFlexibleReplace(content: string, search: string, replace: string):
     }
   } catch (e) {
     console.error("Regex replacement error:", e);
+  }
+
+  // Fallback: Extremely flexible whitespace matcher
+  try {
+    // Strip ALL whitespace from both the source and search strings
+    const stripWhitespace = (str: string) => str.replace(/\s+/g, '');
+    const strippedC = stripWhitespace(normC);
+    const strippedS = stripWhitespace(normS);
+
+    const matchIndex = strippedC.indexOf(strippedS);
+    if (matchIndex !== -1) {
+      // We found a match when ignoring whitespace!
+      // Now we need to find where this match starts and ends in the ORIGINAL string.
+      let startIdxInOriginal = -1;
+      let endIdxInOriginal = -1;
+      let strippedIdx = 0;
+
+      for (let i = 0; i < normC.length; i++) {
+        if (!/\s/.test(normC[i])) {
+          if (strippedIdx === matchIndex) {
+            startIdxInOriginal = i;
+          }
+          if (strippedIdx === matchIndex + strippedS.length - 1) {
+            endIdxInOriginal = i;
+            break;
+          }
+          strippedIdx++;
+        }
+      }
+
+      if (startIdxInOriginal !== -1 && endIdxInOriginal !== -1) {
+        const pre = normC.substring(0, startIdxInOriginal);
+        const post = normC.substring(endIdxInOriginal + 1);
+        return { newContent: pre + normR + post, ok: true };
+      }
+    }
+  } catch (e) {
+    console.error("Advanced whitespace replacement error:", e);
   }
 
   return { newContent: content, ok: false };
@@ -728,6 +766,10 @@ ${currentContent}`;
     }
 
     return { success: false, message: errorMsg };
+  }
+
+  if (updatedContent === currentContent) {
+    return { success: false, message: "修改失敗：找不到符合的程式碼片段，請確認指定的區塊是否正確。" };
   }
 
   // 修改前，先將修改前的 currentContent 寫入 Redis
