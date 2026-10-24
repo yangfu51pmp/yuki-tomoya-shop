@@ -43,14 +43,15 @@ const LINE_ADMIN_USER_ID = process.env.LINE_ADMIN_USER_ID || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
+const BOT_TITLE = '【ユキ&トモヤ管理助手】';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "yangfu51pmp";
-const GITHUB_REPO = process.env.GITHUB_REPO || "yuki-tomoya-shop";
+const GITHUB_REPO = "yangfu51pmp/yuki-tomoya-shop";
 
 // 取得 SITE_URL 並清除可能的 Google 轉址與強制替換舊網址
-const SITE_URL = (process.env.SITE_URL || 'https://yuki-tomoya-shop.vercel.app')
-  .replace(/^https?:\/\/www\.google\.com\/url\?[^=]*=[^&]*&source=gmail&q=/i, '')
-  .replace(/.*sports-cafe-hub.*/i, 'https://yuki-tomoya-shop.vercel.app');
+const SITE_URL = "https://yuki-tomoya-shop.vercel.app";
+// Removed google and old url replaces
+
 
 
 // 提供給前端 page.tsx 即時讀取 Redis 標題、公告與連結的 GET 通道
@@ -910,7 +911,7 @@ export async function POST(req: NextRequest) {
             const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, newVideoUrl);
             await replyLine(
               replyToken,
-              `【ユキ&トモヤ管理助手】\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+              `${BOT_TITLE}\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
               screenshot
             );
             continue;
@@ -949,7 +950,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已為您即時抓取最新手機版官網畫面：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已為您即時抓取最新手機版官網畫面：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -985,7 +986,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot();
           await replyLine(
             replyToken,
-            `【ユキ&トモヤ管理助手】\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+            `${BOT_TITLE}\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           );
           continue;
@@ -1006,7 +1007,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot(undefined, directNotice);
           await replyLine(
             replyToken,
-            `【ユキ&トモヤ管理助手】\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\n${SITE_URL}`,
+            `${BOT_TITLE}\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           );
           continue;
@@ -1027,7 +1028,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot(newTitle, undefined);
           await replyLine(
             replyToken,
-            `【ユキ&トモヤ管理助手】\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
+            `${BOT_TITLE}\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           );
           continue;
@@ -1047,7 +1048,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已為您恢復網站預設背景！\n\n官網已即時生效：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已為您恢復網站預設背景！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1124,7 +1125,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, newVideoUrl);
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1143,7 +1144,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, undefined, newVideoTitle);
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1161,7 +1162,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, "hidden");
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1178,7 +1179,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已恢復預設宣傳影片！\n\n官網已即時生效：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已恢復預設宣傳影片！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1268,22 +1269,22 @@ export async function POST(req: NextRequest) {
               const screenshot = await captureWebsiteScreenshot();
               await replyLine(
                 replyToken,
-                '【ユキ&トモヤ管理助手】\n已成功為您恢復為上一版的版面狀態！',
+                '${BOT_TITLE}\n已成功為您恢復為上一版的版面狀態！',
                 screenshot
               );
               continue;
             } else {
               if (redisClient) await redisClient.quit();
-              await replyLine(replyToken, '【ユキ&トモヤ管理助手】恢復失敗：更新 GitHub 檔案時發生錯誤。');
+              await replyLine(replyToken, '${BOT_TITLE}恢復失敗：更新 GitHub 檔案時發生錯誤。');
               continue;
             }
           } else {
              if (redisClient) await redisClient.quit();
-             await replyLine(replyToken, '【ユキ&トモヤ管理助手】恢復失敗：找不到前一版的歷史紀錄。');
+             await replyLine(replyToken, '${BOT_TITLE}恢復失敗：找不到前一版的歷史紀錄。');
              continue;
           }
         } catch {
-           await replyLine(replyToken, '【ユキ&トモヤ管理助手】恢復失敗：發生系統例外錯誤。');
+           await replyLine(replyToken, '${BOT_TITLE}恢復失敗：發生系統例外錯誤。');
            continue;
         }
       }
@@ -1300,7 +1301,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, newBgUrl);
         await replyLine(
           replyToken,
-          `【ユキ&トモヤ管理助手】\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+          `${BOT_TITLE}\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1447,7 +1448,7 @@ export async function POST(req: NextRequest) {
           );
           continue;
         } else {
-          await replyLine(replyToken, `【ユキ&トモヤ管理助手】調整未完成：${result.message}`);
+          await replyLine(replyToken, `${BOT_TITLE}調整未完成：${result.message}`);
           continue;
         }
       }
@@ -1455,7 +1456,7 @@ export async function POST(req: NextRequest) {
       // 10. 一般引導回覆
       await replyLine(
         replyToken,
-        "【ユキ&トモヤ管理助手】\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
+        "${BOT_TITLE}\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
       );
     }
 
