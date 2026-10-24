@@ -123,7 +123,11 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Not Found", { status: 404 });
     }
 
-    const [site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation, cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8] = await Promise.all([
+    const [
+      site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation,
+      cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8,
+      cat_products_1, cat_products_2, cat_products_3
+    ] = await Promise.all([
       client.get("yt_site_title"),
       client.get("yt_site_announcement"),
       client.get("yt_site_announcement_url"),
@@ -140,6 +144,9 @@ export async function GET(req: NextRequest) {
       client.get("yt_cat_img_6"),
       client.get("yt_cat_img_7"),
       client.get("yt_cat_img_8"),
+      client.get("yt_cat_products_1"),
+      client.get("yt_cat_products_2"),
+      client.get("yt_cat_products_3"),
     ]);
     await client.quit();
 
@@ -161,6 +168,9 @@ export async function GET(req: NextRequest) {
         cat_img_6: cat_img_6 || "",
         cat_img_7: cat_img_7 || "",
         cat_img_8: cat_img_8 || "",
+        cat_products_1: cat_products_1 ? JSON.parse(cat_products_1) : null,
+        cat_products_2: cat_products_2 ? JSON.parse(cat_products_2) : null,
+        cat_products_3: cat_products_3 ? JSON.parse(cat_products_3) : null,
       },
       {
         headers: {
@@ -867,6 +877,74 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          const pendingProductImg = await client.get("yt_pending_product_img");
+          if (pendingProductImg) {
+            try {
+              const { categoryIndex, productId } = JSON.parse(pendingProductImg);
+              const imageRes = await fetch(`https://api-data.line.me/v2/bot/message/${event.message.id}/content`, {
+                headers: { Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}` }
+              });
+
+              if (imageRes.ok) {
+                const arrayBuffer = await imageRes.arrayBuffer();
+                const b64 = Buffer.from(arrayBuffer).toString("base64");
+
+                // Upload to GitHub
+                const githubToken = (process.env.GITHUB_TOKEN || '').trim();
+                const filename = `product-${Date.now()}.jpg`;
+                const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/public/${filename}`;
+
+                if (githubToken) {
+                  await fetch(putUrl, {
+                    method: "PUT",
+                    headers: {
+                      Authorization: `Bearer ${githubToken}`,
+                      Accept: "application/vnd.github.v3+json",
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      message: `Add product image ${filename}`,
+                      content: b64,
+                      branch: "main",
+                    }),
+                  });
+                }
+
+                // Update product in Redis
+                const listKey = `yt_cat_products_${categoryIndex}`;
+                const existingData = await client.get(listKey);
+                if (existingData) {
+                  let products = JSON.parse(existingData);
+                  products = products.map((p: any) => {
+                    if (p.id === productId) {
+                      return { ...p, imageUrl: `/${filename}` };
+                    }
+                    return p;
+                  });
+                  await client.set(listKey, JSON.stringify(products));
+                }
+
+                await client.del("yt_pending_product_img");
+                await client.quit();
+
+                try { revalidatePath("/"); } catch {}
+
+                await new Promise((resolve) => setTimeout(resolve, 20000)); // wait for deployment/cache
+                const screenshot = await captureWebsiteScreenshot();
+                await replyLine(
+                  replyToken,
+                  `✅ 已成功為商品綁定照片！\n\n官網已即時生效：\n${SITE_URL}`,
+                  screenshot,
+                  targetId,
+                  startTime
+                );
+                continue;
+              }
+            } catch (err) {
+              console.error("Failed to process product image upload:", err);
+            }
+          }
+
           const awaitingCatUpload = await client.get("yt_awaiting_cat_upload");
           if (awaitingCatUpload) {
             try {
@@ -1039,6 +1117,115 @@ export async function POST(req: NextRequest) {
       if (allowedAdmins.length > 0 && !allowedAdmins.includes(userId)) {
         if (!isGroupChat) {
           await replyLine(replyToken, "【ユキ&トモヤ】抱歉，您尚未獲得管理員授權。", undefined, targetId, startTime);
+        }
+        continue;
+      }
+
+      // 3.5 新增／上架商品指令
+      const addProductMatch = cleanText.match(/^(?:新增|上架)(文具|教材|小物|分類1|分類2|分類3)(?:商品)?[:：]\s*([^｜|]+)[｜|]([^｜|]+)[｜|](.+)$/);
+      if (addProductMatch && REDIS_URL) {
+        const catName = addProductMatch[1];
+        let catIndex = "1";
+        if (catName.includes("文具") || catName.includes("1")) catIndex = "1";
+        else if (catName.includes("教材") || catName.includes("2")) catIndex = "2";
+        else if (catName.includes("小物") || catName.includes("3")) catIndex = "3";
+
+        const productName = addProductMatch[2].trim();
+        const productPrice = addProductMatch[3].trim();
+        const productDesc = addProductMatch[4].trim();
+        const productId = Date.now().toString();
+
+        const newProduct = {
+          id: productId,
+          name: productName,
+          price: productPrice,
+          desc: productDesc,
+          imageUrl: "" // 將在收到圖片後更新
+        };
+
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+
+        const listKey = `yt_cat_products_${catIndex}`;
+        const existingData = await client.get(listKey);
+        let products = [];
+        if (existingData) {
+          try {
+            products = JSON.parse(existingData);
+          } catch (e) {
+            console.error("Parse products error:", e);
+          }
+        }
+        products.push(newProduct);
+
+        await client.set(listKey, JSON.stringify(products));
+        // 設定 5 分鐘效期的等待狀態
+        await client.set("yt_pending_product_img", JSON.stringify({ categoryIndex: catIndex, productId }), { EX: 300 });
+        await client.quit();
+
+        try { revalidatePath("/"); } catch {}
+
+        await replyLine(
+          replyToken,
+          `已成功上架商品：${productName}\n\n請在 5 分鐘內直接傳送一張商品照片到群組，我會自動為此商品換上照片！`,
+          undefined,
+          targetId,
+          startTime
+        );
+        continue;
+      }
+
+      // 3.6 刪除／下架商品指令
+      const removeProductMatch = cleanText.match(/^(?:刪除|下架)(文具|教材|小物|分類1|分類2|分類3)(?:商品)?[:：]\s*(.+)$/);
+      if (removeProductMatch && REDIS_URL) {
+        const catName = removeProductMatch[1];
+        let catIndex = "1";
+        if (catName.includes("文具") || catName.includes("1")) catIndex = "1";
+        else if (catName.includes("教材") || catName.includes("2")) catIndex = "2";
+        else if (catName.includes("小物") || catName.includes("3")) catIndex = "3";
+
+        const searchKeyword = removeProductMatch[2].trim();
+
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+
+        const listKey = `yt_cat_products_${catIndex}`;
+        const existingData = await client.get(listKey);
+        let products = [];
+        if (existingData) {
+          try {
+            products = JSON.parse(existingData);
+          } catch (e) {
+            console.error("Parse products error:", e);
+          }
+        }
+
+        const initialLength = products.length;
+        products = products.filter((p: any) => !p.name.includes(searchKeyword));
+        const removedCount = initialLength - products.length;
+
+        if (removedCount > 0) {
+          await client.set(listKey, JSON.stringify(products));
+          await client.quit();
+          try { revalidatePath("/"); } catch {}
+
+          const screenshot = await captureWebsiteScreenshot();
+          await replyLine(
+            replyToken,
+            `已成功下架包含「${searchKeyword}」的商品，共移除 ${removedCount} 筆！`,
+            screenshot,
+            targetId,
+            startTime
+          );
+        } else {
+          await client.quit();
+          await replyLine(
+            replyToken,
+            `找不到名稱包含「${searchKeyword}」的商品。`,
+            undefined,
+            targetId,
+            startTime
+          );
         }
         continue;
       }

@@ -24,6 +24,26 @@ export default function HomePage() {
   const [catImg2, setCatImg2] = useState("https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&q=80"); // 益智
   const [catImg3, setCatImg3] = useState("https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&q=80"); // 小物
 
+  // 預設分類商品資料
+  const defaultProducts1 = [
+    { id: "1-1", name: "KOKUYO Campus 筆記本", price: "NT$180", desc: "日本東大生愛用五冊組，好寫不暈染。", imageUrl: "https://images.unsplash.com/photo-1531346878377-a54483b14dc0?w=400&q=80" },
+    { id: "1-2", name: "PILOT 魔擦筆 3 色組", price: "NT$250", desc: "辦公學習必備，滑順好寫好擦。", imageUrl: "https://images.unsplash.com/photo-1585336261022-680e2a5ce249?w=400&q=80" }
+  ];
+
+  const defaultProducts2 = [
+    { id: "2-1", name: "KUMON 益智拼圖", price: "NT$450", desc: "日本學齡啟蒙推薦，培養專注力。", imageUrl: "https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=400&q=80" },
+    { id: "2-2", name: "KUMON 三角鉛筆", price: "NT$150", desc: "適合幼兒抓握的粗三角設計，矯正握姿。", imageUrl: "https://images.unsplash.com/photo-1550592704-6c76defa99ce?w=400&q=80" }
+  ];
+
+  const defaultProducts3 = [
+    { id: "3-1", name: "日本限定 帆布托特包", price: "NT$680", desc: "簡約百搭，輕巧好提，日常好幫手。", imageUrl: "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=400&q=80" },
+    { id: "3-2", name: "日本製 質感馬克杯", price: "NT$350", desc: "職人手作，溫潤質感，提升生活儀式感。", imageUrl: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=400&q=80" }
+  ];
+
+  const [catProducts1, setCatProducts1] = useState(defaultProducts1);
+  const [catProducts2, setCatProducts2] = useState(defaultProducts2);
+  const [catProducts3, setCatProducts3] = useState(defaultProducts3);
+
   const [isVerticalVideo, setIsVerticalVideo] = useState(false);
 
   // 截圖與封面圖模式支援
@@ -81,15 +101,19 @@ export default function HomePage() {
         if (data?.cat_img_1) setCatImg1(data.cat_img_1);
         if (data?.cat_img_2) setCatImg2(data.cat_img_2);
         if (data?.cat_img_3) setCatImg3(data.cat_img_3);
+
+        if (data?.cat_products_1 && data.cat_products_1.length > 0) setCatProducts1(data.cat_products_1);
+        if (data?.cat_products_2 && data.cat_products_2.length > 0) setCatProducts2(data.cat_products_2);
+        if (data?.cat_products_3 && data.cat_products_3.length > 0) setCatProducts3(data.cat_products_3);
       })
       .catch((err) => console.error("讀取網站動態設定失敗:", err));
   }, []);
 
   // 三大日本代購嚴選專區
   const categories = [
-    { id: 1, title: "日本文具類嚴選", desc: "KOKUYO、Pilot、三菱 Uni 等日本大賞機能文具、書寫筆具與桌面收納用品。", tag: "STATIONERY", img: catImg1 },
-    { id: 2, title: "日本益智教材類", desc: "日本 KUMON 公文式益智教具、學齡啟蒙教材、拼圖卡牌與學習輔助用品。", tag: "EDUCATION", img: catImg2 },
-    { id: 3, title: "日本精選其它小物", desc: "日本限定質感生活雜貨、學童日常隨身周邊與日本連線人氣話題小物。", tag: "GOODS & ZAKKA", img: catImg3 },
+    { id: 1, title: "1. 日本文具類嚴選（STATIONERY）", desc: "KOKUYO、Pilot、三菱 Uni 等日本大賞機能文具、書寫筆具與桌面收納用品。", tag: "STATIONERY", img: catImg1, products: catProducts1 },
+    { id: 2, title: "2. 日本益智教材類（EDUCATION）", desc: "日本 KUMON 公文式益智教具、學齡啟蒙教材、拼圖卡牌與學習輔助用品。", tag: "EDUCATION", img: catImg2, products: catProducts2 },
+    { id: 3, title: "3. 日本精選其它小物（GOODS & ZAKKA）", desc: "日本限定質感生活雜貨、學童日常隨身周邊與日本連線人氣話題小物。", tag: "GOODS & ZAKKA", img: catImg3, products: catProducts3 },
   ];
 
 
@@ -340,7 +364,29 @@ export default function HomePage() {
                     <h3 className="text-lg font-bold text-[#6d6d6d] mb-2.5 leading-snug">{item.title}</h3>
                     <p className="text-[13px] text-stone-500 leading-relaxed font-medium">{item.desc}</p>
                   </div>
-                  <div className="mt-6 flex items-center justify-between">
+
+                  <details className="group mt-4 border-t border-slate-100 pt-4">
+                    <summary className="text-sm font-bold text-white bg-[#78C4EC] hover:bg-[#6db3e0] px-4 py-2 rounded-full cursor-pointer list-none flex items-center justify-between shadow-sm transition text-center w-full">
+                      <span className="w-full">✨ 查看本區精選商品（共 {item.products.length} 款） ▾</span>
+                    </summary>
+                    <div className="mt-4 flex flex-col gap-4">
+                      {item.products.map((product) => (
+                        <div key={product.id} className="flex gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-[#6db3e0] transition">
+                          <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-white shadow-sm">
+                            <img src={product.imageUrl || "https://images.unsplash.com/photo-1540340061722-9293d5163008?w=400&q=80"} alt={product.name} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex flex-col flex-1 min-w-0 justify-center">
+                            <h4 className="text-sm font-bold text-stone-700 truncate">{product.name}</h4>
+                            <span className="inline-block self-start mt-1 mb-1 px-2 py-0.5 bg-[#78C4EC] text-white text-[11px] font-bold rounded-sm shadow-sm">{product.price}</span>
+                            <p className="text-[11px] text-stone-500 line-clamp-2">{product.desc}</p>
+                            <a href="https://line.me" target="_blank" rel="noopener noreferrer" className="mt-2 text-[11px] font-bold text-[#78C4EC] hover:text-[#56A8D6] transition">💬 點此用 LINE 詢問／下單此商品 →</a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+
+                  <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
                     <span className="text-[13px] font-bold text-[#78C4EC] group-hover:text-[#56A8D6] transition">LINE 傳圖詢價 →</span>
                   </div>
                 </div>
