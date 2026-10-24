@@ -309,7 +309,7 @@ export default function HomePage() {
         <section id="categories" className="bg-white max-w-7xl mx-auto px-6 sm:px-8 pt-20 pb-16">
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-extrabold tracking-wide text-[#6d6d6d] mb-3">
-              Categories & Selection.
+              Featured Selection.
             </h2>
             <p className="text-[#78C4EC] font-bold text-sm tracking-widest uppercase bg-[#bbe3f8] hover:bg-[#a8d0f0] inline-block px-4 py-1.5 rounded-full">
               ユキ&トモヤ 三大日本嚴選代購專區
