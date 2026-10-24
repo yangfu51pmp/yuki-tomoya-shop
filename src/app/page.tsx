@@ -455,7 +455,7 @@ export default function HomePage() {
             <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           </div>
-          <span className="text-[10px] font-bold tracking-wide mt-0.5">LINE 許願代購</span>
+          <span className="text-[10px] font-bold tracking-wide mt-0.5">LINE 傳圖許願</span>
         </a>
         <a
           href="#categories"
