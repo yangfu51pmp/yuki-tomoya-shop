@@ -20,14 +20,14 @@ export default function HomePage() {
   const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ ユキ&トモヤ 日本現場連線實拍");
 
   // 分類圖片
-  const [catImg1, setCatImg1] = useState("https://images.unsplash.com/photo-1508344928928-7165b67de128?q=80&w=800&auto=format&fit=crop"); // 運動
-  const [catImg2, setCatImg2] = useState("https://images.unsplash.com/photo-1568205612837-017257d2310a?q=80&w=800&auto=format&fit=crop"); // 文具
-  const [catImg3, setCatImg3] = useState("https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=800&auto=format&fit=crop"); // 保健
-  const [catImg4, setCatImg4] = useState("https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=800&auto=format&fit=crop"); // 日常
-  const [catImg5, setCatImg5] = useState("https://images.unsplash.com/photo-1599599810694-b5b37304c041?q=80&w=800&auto=format&fit=crop"); // 零食
-  const [catImg6, setCatImg6] = useState("https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=800&auto=format&fit=crop"); // 服飾
-  const [catImg7, setCatImg7] = useState("https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=800&auto=format&fit=crop"); // 精品
-  const [catImg8, setCatImg8] = useState("https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=800&auto=format&fit=crop"); // 文創
+  const [catImg1, setCatImg1] = useState("https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=800&auto=format&fit=crop"); // 運動 - Japan related or generic sports
+  const [catImg2, setCatImg2] = useState("https://images.unsplash.com/photo-1585255318159-f2dfccebd926?q=80&w=800&auto=format&fit=crop"); // 文具 - pens
+  const [catImg3, setCatImg3] = useState("https://images.unsplash.com/photo-1584308666744-24d5e1c4501a?q=80&w=800&auto=format&fit=crop"); // 保健 - supplements/pharmacy
+  const [catImg4, setCatImg4] = useState("https://images.unsplash.com/photo-1584288002678-75c1c8f12ee7?q=80&w=800&auto=format&fit=crop"); // 日常 - lifestyle
+  const [catImg5, setCatImg5] = useState("https://images.unsplash.com/photo-1601599818817-48f86f734493?q=80&w=800&auto=format&fit=crop"); // 零食 - snacks
+  const [catImg6, setCatImg6] = useState("https://images.unsplash.com/photo-1489987707023-afc899c7d420?q=80&w=800&auto=format&fit=crop"); // 服飾 - clothing
+  const [catImg7, setCatImg7] = useState("https://images.unsplash.com/photo-1555529771-835f59bfc50b?q=80&w=800&auto=format&fit=crop"); // 精品 - boutique
+  const [catImg8, setCatImg8] = useState("https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=800&auto=format&fit=crop"); // 文創 - creative
 
   const [isVerticalVideo, setIsVerticalVideo] = useState(false);
 
