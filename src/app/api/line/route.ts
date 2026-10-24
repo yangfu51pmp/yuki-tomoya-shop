@@ -1379,13 +1379,13 @@ export async function POST(req: NextRequest) {
         let finalMime = "";
         let isSuccess = false;
 
-        // 嘗試第一順位: gemini-2.0-flash-preview-image-generation (or exp)
+        // 嘗試第一順位: gemini-2.0-flash-exp-image-generation
         try {
-          const genRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GEMINI_API_KEY}`, {
+          const genRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${GEMINI_API_KEY}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: "Generate a high quality vertical photo: " + englishPrompt }] }],
+              contents: [{ parts: [{ text: "Generate a high-resolution vertical 4:5 commercial photograph (no text): " + englishPrompt }] }],
               generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
             })
           });
@@ -1393,82 +1393,87 @@ export async function POST(req: NextRequest) {
           if (genRes.ok) {
             const data = await genRes.json();
             const parts = data?.candidates?.[0]?.content?.parts || [];
-            for (const p of parts) {
-              if (p.inlineData?.data) {
-                finalBase64 = p.inlineData.data;
-                finalMime = p.inlineData.mimeType || "image/jpeg";
-                isSuccess = true;
-                break;
-              }
+            const inlineDataPart = parts.find((p: any) => p.inlineData);
+            if (inlineDataPart && inlineDataPart.inlineData?.data) {
+              finalBase64 = inlineDataPart.inlineData.data;
+              finalMime = inlineDataPart.inlineData.mimeType || "image/jpeg";
+              isSuccess = true;
             }
           }
         } catch (e) {
           console.error("Gemini image gen error 1:", e);
         }
 
-        // 嘗試第二順位: imagen-3.0-generate-002
         if (!isSuccess) {
+          // 【Pollinations Flux 真實生圖備援】
           try {
-            const imgRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                instances: [{ prompt: englishPrompt }],
-                parameters: { sampleCount: 1, aspectRatio: "3:4" }
-              })
+            const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(englishPrompt)}?width=800&height=1000&nologo=true&model=flux&seed=${Date.now()}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+            const polliRes = await fetch(pollinationsUrl, {
+              signal: controller.signal,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+              }
             });
-            if (imgRes.ok) {
-              const data = await imgRes.json();
-              if (data?.predictions?.[0]?.bytesBase64Encoded) {
-                finalBase64 = data.predictions[0].bytesBase64Encoded;
-                finalMime = "image/jpeg";
+            clearTimeout(timeoutId);
+
+            if (polliRes.ok) {
+              const buffer = await polliRes.arrayBuffer();
+              if (buffer.byteLength > 10000 && (polliRes.headers.get("content-type") || "").startsWith("image/")) {
+                finalBase64 = Buffer.from(buffer).toString("base64");
+                finalMime = polliRes.headers.get("content-type") || "image/jpeg";
                 isSuccess = true;
               }
             }
           } catch (e) {
-            console.error("Gemini image gen error 2:", e);
+            console.error("Pollinations image fetch error:", e);
+          }
+        }
+
+        let newBgUrl = "";
+
+        if (isSuccess && finalBase64) {
+          // Save Generated Image to GitHub public/
+          const githubToken = (process.env.GITHUB_TOKEN || '').trim();
+          if (githubToken) {
+            try {
+              const fileName = `ai-hero-${Date.now()}.jpg`;
+              const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/public/${fileName}`;
+              const putRes = await fetch(putUrl, {
+                method: "PUT",
+                headers: {
+                  Authorization: `Bearer ${githubToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  message: `chore: AI auto-generated hero image ${fileName}`,
+                  content: finalBase64,
+                  branch: "main",
+                }),
+              });
+
+              if (putRes.ok) {
+                newBgUrl = `https://raw.githubusercontent.com/${REPO_FULL_NAME}/main/public/${fileName}`;
+              }
+            } catch (e) {
+               console.error("Github upload error:", e);
+            }
           }
         }
 
         const client = createClient({ url: REDIS_URL });
         await client.connect();
 
-        let newBgUrl = "";
-
-        if (isSuccess && finalBase64) {
-          await client.set("yt_site_hero_image_b64", finalBase64);
-          await client.set("yt_site_hero_image_mime", finalMime);
-          newBgUrl = `${req.nextUrl.origin}/api/line?hero_img=1&t=${Date.now()}`;
+        if (newBgUrl) {
           await client.set("yt_site_hero_image", newBgUrl);
+          await client.del("yt_site_hero_image_b64");
+          await client.del("yt_site_hero_image_mime");
         } else {
-          // 【Pollinations Flux 真實生圖備援】
-          try {
-            const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(englishPrompt)}?width=1080&height=1350&nologo=true&model=flux&seed=${Date.now()}`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-            const polliRes = await fetch(pollinationsUrl, { signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (polliRes.ok) {
-              const buffer = await polliRes.arrayBuffer();
-              finalBase64 = Buffer.from(buffer).toString("base64");
-              finalMime = polliRes.headers.get("content-type") || "image/jpeg";
-              isSuccess = true;
-
-              await client.set("yt_site_hero_image_b64", finalBase64);
-              await client.set("yt_site_hero_image_mime", finalMime);
-              newBgUrl = `${req.nextUrl.origin}/api/line?hero_img=1&t=${Date.now()}`;
-              await client.set("yt_site_hero_image", newBgUrl);
-            }
-          } catch (e) {
-            console.error("Pollinations image fetch error:", e);
-          }
-
-          if (!isSuccess) {
-            newBgUrl = "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80"; // Ultimate fallback
-            await client.set("yt_site_hero_image", newBgUrl);
-          }
+          // If all generation and uploads failed, use a clear safe fallback
+          newBgUrl = "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=1200&q=80";
+          await client.set("yt_site_hero_image", newBgUrl);
         }
 
         await client.quit();
