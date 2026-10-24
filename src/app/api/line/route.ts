@@ -305,16 +305,30 @@ async function replyLine(replyToken: string, text: string, imageUrl?: string | n
     return res;
   };
 
-  let res = await sendMessages(messages, usePush);
-
-  if (!res.ok && !usePush && targetId) {
-    console.log("replyMessage failed or token expired, falling back to pushMessage");
-    res = await sendMessages(messages, true);
+  let res;
+  try {
+    res = await sendMessages(messages, usePush);
+  } catch (error) {
+    console.error("sendMessages fetch threw an error:", error);
   }
 
-  if (!res.ok && messages.length > 1) {
+  // 強制使用 pushMessage 保底：若回傳 400（token 過期）或其他錯誤，改呼叫 pushMessage API
+  if ((!res || !res.ok) && !usePush && targetId) {
+    console.log("replyMessage failed (token expired or other error), falling back to pushMessage");
+    try {
+      res = await sendMessages(messages, true);
+    } catch (error) {
+      console.error("fallback pushMessage also failed:", error);
+    }
+  }
+
+  if (res && !res.ok && messages.length > 1) {
     console.log("Sending both text and image failed, retrying with only text");
-    await sendMessages([{ type: "text", text }], true);
+    try {
+      await sendMessages([{ type: "text", text }], true);
+    } catch (error) {
+      console.error("Final text-only push failed:", error);
+    }
   }
 }
 
@@ -655,7 +669,19 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
   const currentContent = Buffer.from(fileData.content, "base64").toString("utf-8");
   const fileSha = fileData.sha;
 
-  const prompt = `你是一位精通 Tailwind CSS 與 Next.js 的資深前端工程師。
+  // 判斷指令包含特定模型
+  const claudeMatch = userInstruction.match(/用\s*claude/i);
+  const gptMatch = userInstruction.match(/用\s*(?:chatgpt|openai|gpt)/i);
+  const grokMatch = userInstruction.match(/用\s*grok/i);
+
+  // 清除 "用XXX" 字樣
+  const cleanInstruction = userInstruction
+    .replace(/用\s*claude/ig, "")
+    .replace(/用\s*(?:chatgpt|openai|gpt)/ig, "")
+    .replace(/用\s*grok/ig, "")
+    .trim();
+
+  const finalPrompt = `你是一位精通 Tailwind CSS 與 Next.js 的資深前端工程師。
 以下是 ユキ&トモヤ 日本選物代購 官網首頁檔案：src/app/page.tsx。
 
 【色彩庫與 Class 映射】：
@@ -678,53 +704,34 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
 3. 嚴禁回傳空的 operations！
 
 【管理員指令】：
-"${userInstruction}"
+"${cleanInstruction}"
 
 【目前首頁程式碼】：
 ${currentContent}`;
 
-
   let parsed: { summary?: string; operations?: Array<{ search: string; replace: string }>; modelName?: string; error?: string } = {};
-
-  // 判斷指令包含特定模型
-  const claudeMatch = userInstruction.match(/用\s*claude/i);
-  const gptMatch = userInstruction.match(/用\s*(?:chatgpt|openai|gpt)/i);
-  const grokMatch = userInstruction.match(/用\s*grok/i);
-
-  // 清除 "用XXX" 字樣
-  const cleanInstruction = userInstruction
-    .replace(/用\s*claude/ig, "")
-    .replace(/用\s*(?:chatgpt|openai|gpt)/ig, "")
-    .replace(/用\s*grok/ig, "")
-    .trim();
-
-  // 更新 prompt，使用清除後的 cleanInstruction
-  const finalPrompt = prompt.replace(userInstruction, cleanInstruction);
-
   let openRouterError = "";
 
-  if (claudeMatch) {
-    parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-3.7-sonnet", "anthropic/claude-3.5-sonnet", "openai/gpt-4o"]);
-    if (parsed.error) openRouterError = parsed.error;
+  if (grokMatch) {
+    parsed = await callOpenRouterJson(finalPrompt, ["x-ai/grok-3-mini-beta", "x-ai/grok-3-beta", "openai/gpt-4o"]);
+    if (parsed.error || (!parsed.operations || parsed.operations.length === 0)) {
+      openRouterError = parsed.error || "Grok failed to return valid operations.";
+      parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o"]);
+    }
+  } else if (claudeMatch) {
+    parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"]);
+    if (parsed.error || (!parsed.operations || parsed.operations.length === 0)) {
+      openRouterError = parsed.error || "Claude failed to return valid operations.";
+      parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o"]);
+    }
   } else if (gptMatch) {
-    parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o", "openai/gpt-4o-mini"]);
-    if (parsed.error) openRouterError = parsed.error;
-  } else if (grokMatch) {
-    parsed = await callOpenRouterJson(finalPrompt, ["x-ai/grok-3", "x-ai/grok-2-1212"]);
+    parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o"]);
     if (parsed.error) openRouterError = parsed.error;
   } else {
-    // 預設 Gemini -> 備援 Claude -> GPT-4o -> Grok
+    // 預設 Gemini -> 備援 OpenAI GPT-4o
     parsed = await callGeminiJson(finalPrompt);
     if (!parsed.operations || parsed.operations.length === 0) {
-      parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-3.7-sonnet", "anthropic/claude-3.5-sonnet", "openai/gpt-4o"]);
-      if (parsed.error) openRouterError = parsed.error;
-    }
-    if (!parsed.operations || parsed.operations.length === 0) {
-      parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o", "openai/gpt-4o-mini"]);
-      if (parsed.error) openRouterError = parsed.error;
-    }
-    if (!parsed.operations || parsed.operations.length === 0) {
-      parsed = await callOpenRouterJson(finalPrompt, ["x-ai/grok-3", "x-ai/grok-2-1212"]);
+      parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o"]);
       if (parsed.error) openRouterError = parsed.error;
     }
   }
