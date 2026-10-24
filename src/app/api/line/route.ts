@@ -210,9 +210,40 @@ function getJpegOrientation(buffer: Buffer): "vertical" | "horizontal" {
   return "horizontal";
 }
 
+
+async function callOpenRouterText(prompt: string, models: string[]): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) return null;
+  for (const model of models) {
+    try {
+      const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (aiRes.ok) {
+        const aiData = await aiRes.json();
+        const rawText = aiData?.choices?.[0]?.message?.content || "";
+        if (rawText) return rawText.trim();
+      }
+    } catch (err) {
+      console.error(`OpenRouter text model ${model} error:`, err);
+    }
+  }
+  return null;
+}
+
 // 將中文轉換為英文商業攝影提示詞
 async function translateToEnglishPrompt(chinesePrompt: string): Promise<string> {
   const prompt = `Translate the following user request into a precise English text-to-image prompt, optimized for a commercial photography style. Provide ONLY the translated English prompt, without any extra text or quotes: "${chinesePrompt}"`;
+  const orResult = await callOpenRouterText(prompt, ["openai/gpt-4o-mini", "openai/gpt-4o"]);
+  if (orResult) return orResult;
+
   const result = await callGeminiJson(prompt, true);
   if (result.translatedPrompt) {
     return result.translatedPrompt;
@@ -1113,7 +1144,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 8.1.5 準備上傳背景
-      const uploadBgMatch = rawText.match(/@Sport\s*Cafe\s*(管理)?助手\s*上傳背景/) || cleanText.match(/^(?:準備換背景|主題背景更換|更換背景|換背景|更換主視覺圖|更換主題圖)/);
+      const uploadBgMatch = rawText.match(/@Sport\s*Cafe\s*(管理)?助手\s*上傳背景/) || cleanText.match(/^(?:更換|換|修改|更新|設定)(?:主視覺|主題視覺|主題|背景|首頁|橫幅|Hero)(?:圖|圖片|照片|背景|視覺)?/i);
       if (uploadBgMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
@@ -1342,7 +1373,7 @@ export async function POST(req: NextRequest) {
       const autoBgMatch = cleanText.match(/^(?:背景生圖|AI生圖|生成背景|產生背景|生圖換背景)[：:\s]*(.+)/i);
       if (autoBgMatch && REDIS_URL && GEMINI_API_KEY) {
         const userPrompt = autoBgMatch[1].trim();
-        const englishPrompt = await translateToEnglishPrompt(userPrompt) + ", high-end commercial photography, warm lighting, cinematic, vertical 4:5 aspect ratio, no text";
+        const englishPrompt = await translateToEnglishPrompt(userPrompt);
 
         let finalBase64 = "";
         let finalMime = "";
@@ -1410,43 +1441,34 @@ export async function POST(req: NextRequest) {
           newBgUrl = `${req.nextUrl.origin}/api/line?hero_img=1&t=${Date.now()}`;
           await client.set("yt_site_hero_image", newBgUrl);
         } else {
-          // 【高質感真實攝影備援】
-          const fallbackUrls = [
-            "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1541167760496-1628856ab772?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1444419988131-046ed4e5ffd6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1511886929837-354d827aae26?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1506869640319-ce1c3603d9e8?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80",
-            "https://images.unsplash.com/photo-1517505298132-7ee0f91ceeb5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80"
-          ];
-
-          const selectionPrompt = `Based on the prompt: "${englishPrompt}", pick the most suitable image URL from the following list. Return ONLY the URL, no quotes or other text:\n` + fallbackUrls.join("\n");
-          let bestUrl = fallbackUrls[0];
-
+          // 【Pollinations Flux 真實生圖備援】
           try {
-            const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: selectionPrompt }] }],
-                generationConfig: { temperature: 0.1 }
-              })
-            });
-            if (aiRes.ok) {
-              const aiData = await aiRes.json();
-              const picked = aiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-              if (picked && fallbackUrls.includes(picked)) {
-                bestUrl = picked;
-              }
+            const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(englishPrompt)}?width=1080&height=1350&nologo=true&model=flux&seed=${Date.now()}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+            const polliRes = await fetch(pollinationsUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (polliRes.ok) {
+              const buffer = await polliRes.arrayBuffer();
+              finalBase64 = Buffer.from(buffer).toString("base64");
+              finalMime = polliRes.headers.get("content-type") || "image/jpeg";
+              isSuccess = true;
+
+              await client.set("yt_site_hero_image_b64", finalBase64);
+              await client.set("yt_site_hero_image_mime", finalMime);
+              newBgUrl = `${req.nextUrl.origin}/api/line?hero_img=1&t=${Date.now()}`;
+              await client.set("yt_site_hero_image", newBgUrl);
             }
           } catch (e) {
-            console.error("Gemini fallback selection error:", e);
+            console.error("Pollinations image fetch error:", e);
           }
 
-          newBgUrl = bestUrl;
-          await client.set("yt_site_hero_image", newBgUrl);
+          if (!isSuccess) {
+            newBgUrl = "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80"; // Ultimate fallback
+            await client.set("yt_site_hero_image", newBgUrl);
+          }
         }
 
         await client.quit();
