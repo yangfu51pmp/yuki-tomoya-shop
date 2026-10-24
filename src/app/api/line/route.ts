@@ -221,7 +221,7 @@ async function translateToEnglishPrompt(chinesePrompt: string): Promise<string> 
 }
 
 // 支援傳送文字與截圖
-async function replyLine(replyToken: string, text: string, imageUrl?: string | null) {
+async function replyLine(replyToken: string, text: string, imageUrl?: string | null, targetId?: string, startTime?: number) {
   if (!LINE_CHANNEL_ACCESS_TOKEN) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -235,17 +235,46 @@ async function replyLine(replyToken: string, text: string, imageUrl?: string | n
     });
   }
 
-  await fetch("https://api.line.me/v2/bot/message/reply", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
-    },
-    body: JSON.stringify({
-      replyToken,
-      messages,
-    }),
-  });
+  let usePush = false;
+  if (startTime && targetId) {
+    const elapsed = Date.now() - startTime;
+    if (elapsed > 25000) {
+      usePush = true;
+    }
+  }
+
+  const sendMessages = async (msgs: any[], push: boolean) => {
+    const endpoint = push && targetId
+      ? "https://api.line.me/v2/bot/message/push"
+      : "https://api.line.me/v2/bot/message/reply";
+
+    const body = push && targetId
+      ? { to: targetId, messages: msgs }
+      : { replyToken, messages: msgs };
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    return res;
+  };
+
+  let res = await sendMessages(messages, usePush);
+
+  if (!res.ok && !usePush && targetId) {
+    console.log("replyMessage failed or token expired, falling back to pushMessage");
+    res = await sendMessages(messages, true);
+  }
+
+  if (!res.ok && messages.length > 1) {
+    console.log("Sending both text and image failed, retrying with only text");
+    await sendMessages([{ type: "text", text }], true);
+  }
 }
 
 // 雲端無人瀏覽器即時截圖（自動帶入 Redis 最新標題與公告，確保截圖 100% 零延遲）
@@ -290,37 +319,38 @@ async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?:
     if (orientation) params.set("live_orientation", orientation);
 
     const targetUrl = `${SITE_URL}/?screenshot=true&t=${Date.now()}&${params.toString()}`;
-    const screenshotApi = `https://api.microlink.io?url=${encodeURIComponent(
+    const screenshotApi = `https://api.microlink.io/?url=${encodeURIComponent(
       targetUrl
-    )}&screenshot=true&viewport.isMobile=true&viewport.width=390&viewport.height=${height}&force=true`;
+    )}&screenshot=true&meta=false&waitForTimeout=1500&viewport.isMobile=true&viewport.width=390&viewport.height=${height}&force=true`;
 
     let data;
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 7500);
-      const res = await fetch(screenshotApi, { signal: controller.signal, cache: "no-store" });
-      clearTimeout(timer);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        // Add fresh timestamp on retry to avoid microlink cache completely if needed, but the original logic didn't.
+        // Actually, we'll just append it to targetUrl if it fails, or just fetch again.
+        // Let's just fetch the screenshotApi.
+        const res = await fetch(attempt === 1 ? screenshotApi : `${screenshotApi}&t=${Date.now()}`, { signal: controller.signal, cache: "no-store" });
+        clearTimeout(timer);
 
-      if (!res.ok) {
-        throw new Error(`First screenshot attempt failed with status: ${res.status}`);
+        if (!res.ok) {
+          throw new Error(`Screenshot attempt ${attempt} failed with status: ${res.status}`);
+        }
+        data = await res.json();
+
+        if (data?.data?.screenshot?.url) {
+          return data.data.screenshot.url;
+        }
+      } catch (err) {
+        console.error(`Screenshot attempt ${attempt} failed:`, err);
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
       }
-      data = await res.json();
-    } catch (firstErr) {
-      console.error("First screenshot attempt failed, retrying in 2 seconds...", firstErr);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const controller2 = new AbortController();
-      const timer2 = setTimeout(() => controller2.abort(), 7500);
-      const res2 = await fetch(screenshotApi, { signal: controller2.signal, cache: "no-store" });
-      clearTimeout(timer2);
-
-      if (!res2.ok) {
-        return null;
-      }
-      data = await res2.json();
     }
 
-    return data?.data?.screenshot?.url || null;
+    return null;
   } catch (err) {
     console.error("截圖產生失敗:", err);
     return null;
@@ -707,6 +737,7 @@ ${currentContent}`;
 
 export async function POST(req: NextRequest) {
   try {
+    const startTime = Date.now();
     const body = await req.json();
     const events = body.events || [];
 
@@ -715,6 +746,7 @@ export async function POST(req: NextRequest) {
 
       const userId = event.source.userId;
       const replyToken = event.replyToken;
+      const targetId = event.source.groupId || event.source.roomId || event.source.userId;
       const isGroupChat = event.source.type === "group" || event.source.type === "room";
 
       // 處理上傳圖片事件
@@ -754,7 +786,7 @@ export async function POST(req: NextRequest) {
                   replyToken,
                   `已將您傳送的照片設為官網背景！`,
                   screenshot
-                );
+                , targetId, startTime);
                 continue;
               }
             } catch (err) {
@@ -792,7 +824,7 @@ export async function POST(req: NextRequest) {
                   replyToken,
                   `✅ 已成功更新分類 ${awaitingCatUpload} 的專屬圖片！\n\n官網已即時生效：\n${SITE_URL}`,
                   screenshot
-                );
+                , targetId, startTime);
                 continue;
               }
             } catch (err) {
@@ -858,11 +890,11 @@ export async function POST(req: NextRequest) {
                   await replyLine(
                     replyToken,
                     "✅ 已成功接收您的影片（自動適配橫式／直式比例）並推送至 GitHub！Vercel 正在背景部署中（約 20 秒後生效），稍後請輸入『截圖』驗收！"
-                  );
+                  , undefined, targetId, startTime);
                   continue;
                 } else {
                   await client.quit();
-                  await replyLine(replyToken, "影片檔案可能過大導致上傳失敗，建議您可以改貼 YouTube / Shorts 連結。");
+                  await replyLine(replyToken, "影片檔案可能過大導致上傳失敗，建議您可以改貼 YouTube / Shorts 連結。", undefined, targetId, startTime);
                   continue;
                 }
               }
@@ -911,7 +943,7 @@ export async function POST(req: NextRequest) {
               replyToken,
               `${BOT_TITLE}\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
               screenshot
-            );
+            , targetId, startTime);
             continue;
           }
           await client.quit();
@@ -933,7 +965,7 @@ export async function POST(req: NextRequest) {
       const allowedAdmins = LINE_ADMIN_USER_ID.split(",").map((id) => id.trim()).filter(Boolean);
       if (allowedAdmins.length > 0 && !allowedAdmins.includes(userId)) {
         if (!isGroupChat) {
-          await replyLine(replyToken, "【ユキ&トモヤ】抱歉，您尚未獲得管理員授權。");
+          await replyLine(replyToken, "【ユキ&トモヤ】抱歉，您尚未獲得管理員授權。", undefined, targetId, startTime);
         }
         continue;
       }
@@ -950,7 +982,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已為您即時抓取最新手機版官網畫面：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -966,7 +998,7 @@ export async function POST(req: NextRequest) {
         await replyLine(
           replyToken,
           "謝謝誇獎！我隨時在線待命，有任何門市公告、標題文字、排版樣式或按鈕顏色要調整，隨時 @ 我交代即可 😊⚾☕"
-        );
+        , undefined, targetId, startTime);
         continue;
       }
 
@@ -986,7 +1018,7 @@ export async function POST(req: NextRequest) {
             replyToken,
             `${BOT_TITLE}\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
-          );
+          , targetId, startTime);
           continue;
         }
       }
@@ -1007,7 +1039,7 @@ export async function POST(req: NextRequest) {
             replyToken,
             `${BOT_TITLE}\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
-          );
+          , targetId, startTime);
           continue;
         }
       }
@@ -1028,7 +1060,7 @@ export async function POST(req: NextRequest) {
             replyToken,
             `${BOT_TITLE}\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
-          );
+          , targetId, startTime);
           continue;
         }
       }
@@ -1048,7 +1080,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已為您恢復網站預設背景！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1075,7 +1107,7 @@ export async function POST(req: NextRequest) {
           await replyLine(
             replyToken,
             "請在 5 分鐘內直接傳送該分類的商品照片！"
-          );
+          , undefined, targetId, startTime);
           continue;
         }
       }
@@ -1091,7 +1123,7 @@ export async function POST(req: NextRequest) {
         await replyLine(
           replyToken,
           "請在 5 分鐘內直接傳送一張照片到群組，我會立刻幫您換成官網首頁背景！"
-        );
+        , undefined, targetId, startTime);
         continue;
       }
 
@@ -1106,7 +1138,7 @@ export async function POST(req: NextRequest) {
         await replyLine(
           replyToken,
           "請在 5 分鐘內直接從手機傳送您的 1 分鐘影片到群組，或直接貼上 YouTube 影片網址！"
-        );
+        , undefined, targetId, startTime);
         continue;
       }
 
@@ -1125,7 +1157,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1144,7 +1176,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1162,7 +1194,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1179,7 +1211,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已恢復預設宣傳影片！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1270,20 +1302,20 @@ export async function POST(req: NextRequest) {
                 replyToken,
                 `${BOT_TITLE}\n已成功為您恢復為上一版的版面狀態！`,
                 screenshot
-              );
+              , targetId, startTime);
               continue;
             } else {
               if (redisClient) await redisClient.quit();
-              await replyLine(replyToken, `${BOT_TITLE}恢復失敗：更新 GitHub 檔案時發生錯誤。`);
+              await replyLine(replyToken, `${BOT_TITLE}恢復失敗：更新 GitHub 檔案時發生錯誤。`, undefined, targetId, startTime);
               continue;
             }
           } else {
              if (redisClient) await redisClient.quit();
-             await replyLine(replyToken, `${BOT_TITLE}恢復失敗：找不到前一版的歷史紀錄。`);
+             await replyLine(replyToken, `${BOT_TITLE}恢復失敗：找不到前一版的歷史紀錄。`, undefined, targetId, startTime);
              continue;
           }
         } catch {
-           await replyLine(replyToken, `${BOT_TITLE}恢復失敗：發生系統例外錯誤。`);
+           await replyLine(replyToken, `${BOT_TITLE}恢復失敗：發生系統例外錯誤。`, undefined, targetId, startTime);
            continue;
         }
       }
@@ -1302,7 +1334,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `${BOT_TITLE}\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1426,7 +1458,7 @@ export async function POST(req: NextRequest) {
           replyToken,
           `已為您 AI 生成並更新網站背景！\n\n生成提示詞：${englishPrompt}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
-        );
+        , targetId, startTime);
         continue;
       }
 
@@ -1444,10 +1476,10 @@ export async function POST(req: NextRequest) {
             replyToken,
             `【ユキ&トモヤ AI 工程師 (由 ${result.modelName || "AI"} 提供)】🛠️\n已成功為您調整網站代碼：${result.message}！\n\n⚡ 已自動推送到 GitHub 並完成部署，附上最新畫面！`,
             newScreenshotUrl
-          );
+          , targetId, startTime);
           continue;
         } else {
-          await replyLine(replyToken, `${BOT_TITLE}調整未完成：${result.message}`);
+          await replyLine(replyToken, `${BOT_TITLE}調整未完成：${result.message}`, undefined, targetId, startTime);
           continue;
         }
       }
@@ -1456,7 +1488,7 @@ export async function POST(req: NextRequest) {
       await replyLine(
         replyToken,
         "${BOT_TITLE}\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
-      );
+      , undefined, targetId, startTime);
     }
 
     return NextResponse.json({ success: true });
