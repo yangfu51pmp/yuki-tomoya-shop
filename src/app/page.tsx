@@ -20,14 +20,9 @@ export default function HomePage() {
   const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ ユキ&トモヤ 日本現場連線實拍");
 
   // 分類圖片
-  const [catImg1, setCatImg1] = useState("https://images.unsplash.com/photo-1508344928928-7165b67de128?q=80&w=800&auto=format&fit=crop"); // 運動
-  const [catImg2, setCatImg2] = useState("https://images.unsplash.com/photo-1568205612837-017257d2310a?q=80&w=800&auto=format&fit=crop"); // 文具
-  const [catImg3, setCatImg3] = useState("https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=800&auto=format&fit=crop"); // 保健
-  const [catImg4, setCatImg4] = useState("https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=800&auto=format&fit=crop"); // 日常
-  const [catImg5, setCatImg5] = useState("https://images.unsplash.com/photo-1599599810694-b5b37304c041?q=80&w=800&auto=format&fit=crop"); // 零食
-  const [catImg6, setCatImg6] = useState("https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=800&auto=format&fit=crop"); // 服飾
-  const [catImg7, setCatImg7] = useState("https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=800&auto=format&fit=crop"); // 精品
-  const [catImg8, setCatImg8] = useState("https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=800&auto=format&fit=crop"); // 文創
+  const [catImg1, setCatImg1] = useState("https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?w=800&q=80"); // 文具
+  const [catImg2, setCatImg2] = useState("https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&q=80"); // 益智
+  const [catImg3, setCatImg3] = useState("https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&q=80"); // 小物
 
   const [isVerticalVideo, setIsVerticalVideo] = useState(false);
 
@@ -86,25 +81,15 @@ export default function HomePage() {
         if (data?.cat_img_1) setCatImg1(data.cat_img_1);
         if (data?.cat_img_2) setCatImg2(data.cat_img_2);
         if (data?.cat_img_3) setCatImg3(data.cat_img_3);
-        if (data?.cat_img_4) setCatImg4(data.cat_img_4);
-        if (data?.cat_img_5) setCatImg5(data.cat_img_5);
-        if (data?.cat_img_6) setCatImg6(data.cat_img_6);
-        if (data?.cat_img_7) setCatImg7(data.cat_img_7);
-        if (data?.cat_img_8) setCatImg8(data.cat_img_8);
       })
       .catch((err) => console.error("讀取網站動態設定失敗:", err));
   }, []);
 
-  // 八大日本代購嚴選專區
+  // 三大日本代購嚴選專區
   const categories = [
-    { id: 1, title: "日本運動用品嚴選", desc: "棒壘球實戰裝備（日規手套、球棒、打擊配件）及其他專業運動護具用品。", tag: "SPORTS", img: catImg1 },
-    { id: 2, title: "日本文具與教材用品", desc: "日本益智教材、KOKUYO、Pilot、三菱 Uni 等日本大賞機能文具與學用品。", tag: "STATIONERY", img: catImg2 },
-    { id: 3, title: "日本營養保健＆益生菌", desc: "符合進出口規範之日本大廠保健食品、家庭常備機能益生菌與日常營養補給。", tag: "HEALTH", img: catImg3 },
-    { id: 4, title: "日本日常生活＆電器商品", desc: "日本空間芳香劑、高階充電電池、人氣居家實用小家電與日用品。", tag: "DAILY & TECH", img: catImg4 },
-    { id: 5, title: "日本熱門零食＆飲品", desc: "日本各地人氣餅乾、季節限定糖果、伴手禮盒與精選沖泡飲品。", tag: "SNACKS", img: catImg5 },
-    { id: 6, title: "日本休閒服飾（男／女／童）", desc: "日系機能與日常百搭服飾，涵蓋男裝、女裝與舒適耐穿的兒童穿搭。", tag: "APPAREL", img: catImg6 },
-    { id: 7, title: "日本精品＆質感鍋碗餐具", desc: "日本平價輕奢飾品、美濃燒／有田燒精緻鍋碗盤餐具與廚房美學器皿。", tag: "BOUTIQUE", img: catImg7 },
-    { id: 8, title: "日本文創＆特殊創意商品", desc: "日本各地限定文創小物、特色設計雜貨與精美創意禮品。", tag: "CREATIVE", img: catImg8 },
+    { id: 1, title: "日本文具類嚴選", desc: "KOKUYO、Pilot、三菱 Uni 等日本大賞機能文具、書寫筆具與桌面收納用品。", tag: "STATIONERY", img: catImg1 },
+    { id: 2, title: "日本益智教材類", desc: "日本 KUMON 公文式益智教具、學齡啟蒙教材、拼圖卡牌與學習輔助用品。", tag: "EDUCATION", img: catImg2 },
+    { id: 3, title: "日本精選其它小物", desc: "日本限定質感生活雜貨、學童日常隨身周邊與日本連線人氣話題小物。", tag: "GOODS & ZAKKA", img: catImg3 },
   ];
 
 
@@ -198,7 +183,7 @@ export default function HomePage() {
           <div className="max-w-md mx-auto divide-y divide-[#E5F3FC] text-[#6d6d6d] text-base font-medium">
             {[
               { title: "代購流程", items: ["如何許願", "費用計算", "國際運送"] },
-              { title: "八大日本嚴選代購品類", items: ["SPORTS 運動用品", "STATIONERY 文具教材", "HEALTH 保健益生菌", "DAILY 日常電器", "SNACKS 零食飲品", "APPAREL 服飾穿搭", "BOUTIQUE 精品餐具", "CREATIVE 文創設計"] },
+              { title: "三大日本嚴選代購專區", items: ["STATIONERY 文具教材", "EDUCATION 益智教具", "GOODS 質感小物"] },
               { title: "日本現場實拍", items: ["連線動態", "職人實地採購"] },
               { title: "線上客服", items: ["專人 LINE 諮詢"] },
             ].map((section, idx) => (
