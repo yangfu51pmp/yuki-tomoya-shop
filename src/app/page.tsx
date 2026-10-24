@@ -109,7 +109,7 @@ export default function HomePage() {
 
 
   return (
-    <div className="min-h-screen bg-white text-[#7A1B28] flex flex-col font-sans relative pb-16 md:pb-0">
+    <div className="min-h-screen bg-white text-[#6d6d6d] flex flex-col font-sans relative pb-16 md:pb-0">
       <style>{`
         @keyframes marqueeSlide {
           0% { transform: translateX(45%); }
@@ -124,7 +124,7 @@ export default function HomePage() {
       `}</style>
 
       {/* 1. 頂部公告欄（動態顯示 Redis 公告與連結） */}
-      <aside className="bg-[#C8A878] hover:bg-[#B89868] text-white text-xs sm:text-sm py-2 px-4 text-center overflow-hidden shadow-sm relative z-50">
+      <aside className="bg-[#78C4EC] hover:bg-[#6db3e0] text-white text-xs sm:text-sm py-2 px-4 text-center overflow-hidden shadow-sm relative z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 overflow-hidden">
           <a
             href={siteAnnouncementUrl || "#"}
@@ -143,13 +143,13 @@ export default function HomePage() {
       </aside>
 
       {/* 2. 頂部導覽列 */}
-      <header className="bg-white border-b border-[#B89868] sticky top-0 z-40 px-6 sm:px-10 py-4 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b border-[#6db3e0] sticky top-0 z-40 px-6 sm:px-10 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#78C4EC] flex items-center justify-center font-bold text-white text-lg shadow-sm border-2 border-white">
             Y&T
           </div>
           <div className="flex flex-col">
-            <span className="font-bold tracking-widest text-lg text-[#7A1B28]">
+            <span className="font-bold tracking-widest text-lg text-[#6d6d6d]">
               ユキ&トモヤ
             </span>
             <span className="text-[9px] text-stone-400 tracking-wider">YUKI & TOMOYA JAPAN SELECT</span>
@@ -157,14 +157,14 @@ export default function HomePage() {
         </div>
 
         <nav className="hidden lg:flex items-center gap-7 text-[13px] font-medium text-stone-600 tracking-wider">
-          <a href="#about" className="hover:text-[#C8A878] transition">代購流程</a>
-          <a href="#categories" className="hover:text-[#C8A878] transition">嚴選品類</a>
-          <a href="#video" className="hover:text-[#C8A878] transition">日本現場實拍</a>
-          <a href="#contact" className="hover:text-[#C8A878] transition">客服諮詢</a>
+          <a href="#about" className="hover:text-[#78C4EC] transition">代購流程</a>
+          <a href="#categories" className="hover:text-[#78C4EC] transition">嚴選品類</a>
+          <a href="#video" className="hover:text-[#78C4EC] transition">日本現場實拍</a>
+          <a href="#contact" className="hover:text-[#78C4EC] transition">客服諮詢</a>
         </nav>
 
         <div className="flex items-center gap-4">
-          <button className="hidden sm:flex items-center gap-1 text-xs font-bold text-[#C8A878] bg-[#BA9868] hover:bg-[#a68455] px-3 py-1.5 rounded-full hover:bg-[#78C4EC] hover:text-white transition">
+          <button className="hidden sm:flex items-center gap-1 text-xs font-bold text-[#78C4EC] bg-[#bbe3f8] hover:bg-[#a8d0f0] px-3 py-1.5 rounded-full hover:bg-[#78C4EC] hover:text-white transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
@@ -174,7 +174,7 @@ export default function HomePage() {
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="選單"
-            className="text-[#C8A878] transition p-1"
+            className="text-[#78C4EC] transition p-1"
           >
             {menuOpen ? (
               <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -192,10 +192,10 @@ export default function HomePage() {
             {/* 3. 全螢幕漢堡分類選單 */}
       {menuOpen && (
         <div className="fixed inset-0 top-[110px] bg-white z-40 overflow-y-auto px-6 py-8 shadow-2xl">
-          <div className="max-w-md mx-auto bg-[#C8A878] hover:bg-[#B89868] text-white py-3 px-6 rounded-xl font-medium text-sm mb-6 shadow-sm">
+          <div className="max-w-md mx-auto bg-[#78C4EC] hover:bg-[#6db3e0] text-white py-3 px-6 rounded-xl font-medium text-sm mb-6 shadow-sm">
             YUKI & TOMOYA 專屬選單
           </div>
-          <div className="max-w-md mx-auto divide-y divide-[#E5F3FC] text-[#7A1B28] text-base font-medium">
+          <div className="max-w-md mx-auto divide-y divide-[#E5F3FC] text-[#6d6d6d] text-base font-medium">
             {[
               { title: "代購流程", items: ["如何許願", "費用計算", "國際運送"] },
               { title: "八大日本嚴選代購品類", items: ["SPORTS 運動用品", "STATIONERY 文具教材", "HEALTH 保健益生菌", "DAILY 日常電器", "SNACKS 零食飲品", "APPAREL 服飾穿搭", "BOUTIQUE 精品餐具", "CREATIVE 文創設計"] },
@@ -203,9 +203,9 @@ export default function HomePage() {
               { title: "線上客服", items: ["專人 LINE 諮詢"] },
             ].map((section, idx) => (
               <div key={idx} className="py-4 flex flex-col gap-2">
-                <div className="flex items-center justify-between cursor-pointer hover:text-[#C8A878]">
+                <div className="flex items-center justify-between cursor-pointer hover:text-[#78C4EC]">
                   <span>{section.title}</span>
-                  <span className="text-xl font-light text-[#C8A878]">+</span>
+                  <span className="text-xl font-light text-[#78C4EC]">+</span>
                 </div>
               </div>
             ))}
@@ -215,7 +215,7 @@ export default function HomePage() {
 
       {/* 4. Hero 主視覺（動態顯示 Redis 主標題） */}
       <main className="flex-1">
-        <div className="bg-[#C8A878] hover:bg-[#B89868] text-white text-center pb-4 pt-1 relative">
+        <div className="bg-[#78C4EC] hover:bg-[#6db3e0] text-white text-center pb-4 pt-1 relative">
           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[16px] border-t-[#78C4EC] z-30"></div>
         </div>
         <section
@@ -235,7 +235,7 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-[#1A1A1A]/70 z-10" />
 
           <div className="relative z-20 max-w-4xl w-full mx-auto px-6 flex flex-col items-center mt-32">
-            <div className="inline-block px-5 py-2 mb-4 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase bg-[#C8A878] hover:bg-[#B89868] text-white shadow-md">
+            <div className="inline-block px-5 py-2 mb-4 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase bg-[#78C4EC] hover:bg-[#6db3e0] text-white shadow-md">
               + YUKI & TOMOYA JAPAN DIRECT +
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight drop-shadow-md">
@@ -249,9 +249,9 @@ export default function HomePage() {
 
         {/* 宣傳影片區塊 */}
         {sitePromoVideo !== "hidden" && (
-          <section id="video" className="bg-[#EBF6FC] py-16 px-6 border-b border-[#B89868]">
+          <section id="video" className="bg-[#EBF6FC] py-16 px-6 border-b border-[#6db3e0]">
             <div className="max-w-5xl mx-auto flex flex-col items-center">
-              <div className="inline-block px-4 py-1.5 mb-6 rounded-full text-[11px] font-bold tracking-widest text-[#C8A878] bg-white border border-[#C8A878]/30 uppercase shadow-sm">
+              <div className="inline-block px-4 py-1.5 mb-6 rounded-full text-[11px] font-bold tracking-widest text-[#78C4EC] bg-white border border-[#C8A878]/30 uppercase shadow-sm">
                 {sitePromoVideoTitle}
               </div>
 
@@ -274,8 +274,8 @@ export default function HomePage() {
                   );
                 } else {
                   const videoClass = isVerticalVideo
-                    ? "max-w-[360px] w-full mx-auto aspect-[9/16] object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#78C4EC]/40"
-                    : "w-full max-w-4xl mx-auto aspect-video object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#78C4EC]/40";
+                    ? "max-w-[360px] w-full mx-auto aspect-[9/16] object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#bbe3f8]/40"
+                    : "w-full max-w-4xl mx-auto aspect-video object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#bbe3f8]/40";
 
                   if (isScreenshotMode && sitePromoPoster) {
                     const screenshotContainerClass = isVerticalVideo
@@ -288,7 +288,7 @@ export default function HomePage() {
                           src={sitePromoPoster}
                           alt="Video Poster"
                           onLoad={(e) => setIsVerticalVideo(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)}
-                          className="w-full h-auto block rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#78C4EC]/40"
+                          className="w-full h-auto block rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#bbe3f8]/40"
                         />
                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center rounded-2xl m-1">
                           <div className="w-16 h-16 bg-[#78C4EC]/80 backdrop-blur-md rounded-full flex items-center justify-center border border-white/80 shadow-lg">
@@ -323,40 +323,40 @@ export default function HomePage() {
         {/* 八大日本代購嚴選專區 */}
         <section id="categories" className="bg-white max-w-7xl mx-auto px-6 sm:px-8 pt-20 pb-16">
           <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-wide text-[#7A1B28] mb-3">
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-wide text-[#6d6d6d] mb-3">
               Categories & Selection.
             </h2>
-            <p className="text-[#C8A878] font-bold text-sm tracking-widest uppercase bg-[#BA9868] hover:bg-[#a68455] inline-block px-4 py-1.5 rounded-full">
+            <p className="text-[#78C4EC] font-bold text-sm tracking-widest uppercase bg-[#bbe3f8] hover:bg-[#a8d0f0] inline-block px-4 py-1.5 rounded-full">
               ユキ&トモヤ 八大日本嚴選代購品類
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {categories.map((item) => (
-              <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-[#B89868] flex flex-col group cursor-pointer">
+              <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-[#6db3e0] flex flex-col group cursor-pointer">
                 <div className="h-52 overflow-hidden relative bg-[#F2F2F2]">
                   <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5">
-                    <div className="w-7 h-7 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-xs font-extrabold text-[#C8A878] shadow-sm border border-[#B89868]">
+                    <div className="w-7 h-7 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-xs font-extrabold text-[#78C4EC] shadow-sm border border-[#6db3e0]">
                       {item.id}.
                     </div>
-                    <div className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold text-[#7A1B28] tracking-wider shadow-sm">
+                    <div className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold text-[#6d6d6d] tracking-wider shadow-sm">
                       {item.tag}
                     </div>
                   </div>
                   <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
                 </div>
                 <div className="p-6 flex-1 flex flex-col justify-between bg-white relative">
-                  <div className="absolute -top-6 right-6 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md z-20 group-hover:-translate-y-1 transition border border-[#B89868]">
-                    <svg className="w-5 h-5 text-[#C8A878]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <div className="absolute -top-6 right-6 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md z-20 group-hover:-translate-y-1 transition border border-[#6db3e0]">
+                    <svg className="w-5 h-5 text-[#78C4EC]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-[#7A1B28] mb-2.5 leading-snug">{item.title}</h3>
+                    <h3 className="text-lg font-bold text-[#6d6d6d] mb-2.5 leading-snug">{item.title}</h3>
                     <p className="text-[13px] text-stone-500 leading-relaxed font-medium">{item.desc}</p>
                   </div>
                   <div className="mt-6 flex items-center justify-between">
-                    <span className="text-[13px] font-bold text-[#C8A878] group-hover:text-[#56A8D6] transition">LINE 傳圖詢價 →</span>
+                    <span className="text-[13px] font-bold text-[#78C4EC] group-hover:text-[#56A8D6] transition">LINE 傳圖詢價 →</span>
                   </div>
                 </div>
               </div>
@@ -366,14 +366,14 @@ export default function HomePage() {
       </main>
 
       {/* 5. 底部 Footer */}
-      <footer className="bg-[#EBF6FC] border-t border-[#B89868] text-[#7A1B28] py-12 px-6 sm:px-12">
+      <footer className="bg-[#EBF6FC] border-t border-[#6db3e0] text-[#6d6d6d] py-12 px-6 sm:px-12">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-[#78C4EC] flex items-center justify-center font-bold text-white text-lg shadow-sm border-2 border-white">
                 Y&T
               </div>
-              <span className="font-bold tracking-widest text-lg text-[#7A1B28]">
+              <span className="font-bold tracking-widest text-lg text-[#6d6d6d]">
                 ユキ&トモヤ
               </span>
             </div>
@@ -385,7 +385,7 @@ export default function HomePage() {
           </div>
 
           <div id="contact">
-            <div className="font-bold text-[#C8A878] text-sm mb-4 tracking-wider">聯絡我們</div>
+            <div className="font-bold text-[#78C4EC] text-sm mb-4 tracking-wider">聯絡我們</div>
             <div className="space-y-3 text-sm text-stone-600 font-medium">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -399,10 +399,10 @@ export default function HomePage() {
           </div>
 
           <div>
-            <div className="font-bold text-[#C8A878] text-sm mb-4 tracking-wider">快速導覽</div>
+            <div className="font-bold text-[#78C4EC] text-sm mb-4 tracking-wider">快速導覽</div>
             <ul className="space-y-2 text-sm text-stone-600 font-medium">
-              <li><a href="#categories" className="hover:text-[#C8A878] transition">嚴選品類</a></li>
-              <li><a href="#video" className="hover:text-[#C8A878] transition">現場實拍</a></li>
+              <li><a href="#categories" className="hover:text-[#78C4EC] transition">嚴選品類</a></li>
+              <li><a href="#video" className="hover:text-[#78C4EC] transition">現場實拍</a></li>
             </ul>
           </div>
         </div>
@@ -413,12 +413,12 @@ export default function HomePage() {
       </footer>
 
       {/* 6. 底部固定四格導覽列（KUMON 風格） */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 h-[56px] bg-[#BA9868] hover:bg-[#a68455] border-t border-[#C8A878]/30 flex items-stretch shadow-[0_-4px_10px_rgba(0,0,0,0.03)] pb-safe md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 h-[56px] bg-[#bbe3f8] hover:bg-[#a8d0f0] border-t border-[#C8A878]/30 flex items-stretch shadow-[0_-4px_10px_rgba(0,0,0,0.03)] pb-safe md:hidden">
         <a
           href="https://line.me"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#7A1B28] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#6d6d6d] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
         >
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
@@ -428,7 +428,7 @@ export default function HomePage() {
         </a>
         <a
           href="#categories"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#7A1B28] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#6d6d6d] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
         >
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#78C4EC]"></span>
@@ -438,7 +438,7 @@ export default function HomePage() {
         </a>
         <a
           href="#video"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#7A1B28] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#6d6d6d] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
         >
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F29B9B]"></span>
@@ -449,7 +449,7 @@ export default function HomePage() {
         <button
           onClick={() => setContactOpen(!contactOpen)}
           aria-label="展開"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#7A1B28] hover:bg-[#78C4EC]/10 transition"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#6d6d6d] hover:bg-[#78C4EC]/10 transition"
         >
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#E2B857]"></span>
@@ -461,8 +461,8 @@ export default function HomePage() {
 
       {/* 7. 右下角彈出選單 */}
       {contactOpen && (
-        <div className="fixed bottom-[70px] right-3 z-50 bg-white rounded-2xl shadow-xl border border-[#B89868] p-4 w-[240px]">
-          <div className="text-xs font-bold text-[#C8A878] mb-3 pb-2 border-b border-[#B89868] flex items-center justify-between">
+        <div className="fixed bottom-[70px] right-3 z-50 bg-white rounded-2xl shadow-xl border border-[#6db3e0] p-4 w-[240px]">
+          <div className="text-xs font-bold text-[#78C4EC] mb-3 pb-2 border-b border-[#6db3e0] flex items-center justify-between">
             <span>聯絡客服</span>
             <span className="cursor-pointer text-stone-400 hover:text-stone-600 text-sm" onClick={() => setContactOpen(false)}>✕</span>
           </div>
