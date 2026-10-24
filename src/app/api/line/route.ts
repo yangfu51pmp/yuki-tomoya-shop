@@ -44,9 +44,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
 const BOT_TITLE = '【ユキ&トモヤ管理助手】';
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
-const GITHUB_OWNER = process.env.GITHUB_OWNER || "yangfu51pmp";
-const GITHUB_REPO = "yangfu51pmp/yuki-tomoya-shop";
+const REPO_FULL_NAME = 'yangfu51pmp/yuki-tomoya-shop';
 
 // 取得 SITE_URL 並清除可能的 Google 轉址與強制替換舊網址
 const SITE_URL = "https://yuki-tomoya-shop.vercel.app";
@@ -280,7 +278,6 @@ async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?:
 
     const params = new URLSearchParams({
       preview_key: "cafe888",
-      screenshot: "1",
       t: String(Date.now()),
       cb: String(Date.now()),
     });
@@ -292,7 +289,7 @@ async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?:
     if (poster) params.set("live_poster", poster);
     if (orientation) params.set("live_orientation", orientation);
 
-    const targetUrl = `${SITE_URL}?${params.toString()}`;
+    const targetUrl = `${SITE_URL}/?screenshot=true&t=${Date.now()}&${params.toString()}`;
     const screenshotApi = `https://api.microlink.io?url=${encodeURIComponent(
       targetUrl
     )}&screenshot=true&viewport.isMobile=true&viewport.width=390&viewport.height=${height}&force=true`;
@@ -466,7 +463,8 @@ async function callOpenRouterJson(prompt: string, models: string[]): Promise<{ s
 
 // GitHub 程式碼修改核心（用於服務項目文字、顏色、版面調整）
 async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
-  if (!GITHUB_TOKEN) {
+  const githubToken = (process.env.GITHUB_TOKEN || '').trim();
+  if (!githubToken) {
     console.error("No GITHUB_TOKEN provided.");
     return false;
   }
@@ -474,9 +472,9 @@ async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
   try {
     let sha = "";
     // 1. 取得 public 目錄檔案列表，尋找 promo.mp4 以取得 sha
-    const listRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/public`, {
+    const listRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/contents/public`, {
       headers: {
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github.v3+json",
       },
     });
@@ -490,7 +488,7 @@ async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
     }
 
     // 2. 上傳或覆蓋檔案
-    const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/public/promo.mp4`;
+    const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/public/promo.mp4`;
     const putBody: { message: string; content: string; branch: string; sha?: string } = {
       message: "Update promo.mp4 via LINE bot",
       content: base64Content,
@@ -503,7 +501,7 @@ async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
     const putRes = await fetch(putUrl, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github.v3+json",
         "Content-Type": "application/json",
       },
@@ -524,16 +522,16 @@ async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
 }
 
 async function modifyFrontendCode(userInstruction: string): Promise<{ success: boolean; message: string; modelName?: string; expectedText?: string }> {
-  if (!GITHUB_TOKEN) {
+  const githubToken = (process.env.GITHUB_TOKEN || '').trim();
+  if (!githubToken) {
     return { success: false, message: "尚未在 Vercel 設定 GITHUB_TOKEN。" };
   }
 
-  const filePath = "src/app/page.tsx";
-  const getUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+  const getUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx`;
 
   const getRes = await fetch(getUrl, {
     headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Authorization: `Bearer ${githubToken}`,
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "SportCafe-Bot",
     },
@@ -541,7 +539,7 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
   });
 
   if (!getRes.ok) {
-    return { success: false, message: `讀取 GitHub 失敗 (狀態碼: ${getRes.status})` };
+    return { success: false, message: `讀取 GitHub 失敗 (狀態碼: ${getRes.status}, 路徑: ${getUrl}, Token: ${githubToken ? '已設定' : '未設定'})` };
   }
 
   const fileData = await getRes.json();
@@ -683,11 +681,11 @@ ${currentContent}`;
     }
   }
 
-  const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+  const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx`;
   const putRes = await fetch(putUrl, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Authorization: `Bearer ${githubToken}`,
       Accept: "application/vnd.github.v3+json",
       "Content-Type": "application/json",
       "User-Agent": "SportCafe-Bot",
@@ -994,7 +992,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 7. 門市公告修改（Redis 高速通道，支援「公告改為...」、「把公告換成...」）
-      const noticeMatch = cleanText.match(/公告(?:文字|內容)?(?:更改為?|修改為?|設定?為|改成|改為|換成)[：:\s]*(.+)/);
+      const noticeMatch = cleanText.match(/(?:修改公告|改公告|公告(?:文字|內容)?(?:更改為?|修改為?|設定?為|改成|改為|換成))[：:\s]*(.+)/);
       if (noticeMatch && REDIS_URL) {
         const directNotice = noticeMatch[1].replace(/^[「『"“]|["”』」]$/g, "").trim();
         if (directNotice) {
@@ -1083,7 +1081,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 8.1.5 準備上傳背景
-      const uploadBgMatch = rawText.match(/@Sport\s*Cafe\s*(管理)?助手\s*上傳背景/) || cleanText.match(/^(?:準備換背景|主題背景更換|更換背景|換背景)/);
+      const uploadBgMatch = rawText.match(/@Sport\s*Cafe\s*(管理)?助手\s*上傳背景/) || cleanText.match(/^(?:準備換背景|主題背景更換|更換背景|換背景|更換主視覺圖|更換主題圖)/);
       if (uploadBgMatch && REDIS_URL) {
         const client = createClient({ url: REDIS_URL });
         await client.connect();
@@ -1188,12 +1186,13 @@ export async function POST(req: NextRequest) {
 
       // 8.1.10 恢復上一版
       const restoreMatch = cleanText.match(/^(?:恢復上一版|恢復回上一版|還原上一版|恢復前一版)/);
-      if (restoreMatch && GITHUB_TOKEN) {
+      const githubToken = (process.env.GITHUB_TOKEN || '').trim();
+      if (restoreMatch && githubToken) {
         try {
           // 先取得目前線上的最新內容與 sha
-          const currFileRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/src/app/page.tsx`, {
+          const currFileRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx`, {
             headers: {
-              "Authorization": `Bearer ${GITHUB_TOKEN}`,
+              "Authorization": `Bearer ${githubToken}`,
               "Accept": "application/vnd.github.v3+json",
               "User-Agent": "Sport-Cafe-Bot"
             },
@@ -1216,9 +1215,9 @@ export async function POST(req: NextRequest) {
 
           // 如果 Redis 沒資料，嘗試第二重保障：從 GitHub Commits API 取得前一版
           if (!previousContent) {
-            const commitsRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits?path=src/app/page.tsx&per_page=2`, {
+            const commitsRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/commits?path=src/app/page.tsx&per_page=2`, {
               headers: {
-                "Authorization": `Bearer ${GITHUB_TOKEN}`,
+                "Authorization": `Bearer ${githubToken}`,
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "Sport-Cafe-Bot"
               }
@@ -1228,9 +1227,9 @@ export async function POST(req: NextRequest) {
             if (commitsRes.ok && commitsData.length > 1) {
               const previousCommitSha = commitsData[1].sha;
 
-              const fileRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/src/app/page.tsx?ref=${previousCommitSha}`, {
+              const fileRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx?ref=${previousCommitSha}`, {
                 headers: {
-                  "Authorization": `Bearer ${GITHUB_TOKEN}`,
+                  "Authorization": `Bearer ${githubToken}`,
                   "Accept": "application/vnd.github.v3+json",
                   "User-Agent": "Sport-Cafe-Bot"
                 }
@@ -1244,10 +1243,10 @@ export async function POST(req: NextRequest) {
           }
 
           if (previousContent) {
-            const updateRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/src/app/page.tsx`, {
+            const updateRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx`, {
               method: 'PUT',
               headers: {
-                "Authorization": `Bearer ${GITHUB_TOKEN}`,
+                "Authorization": `Bearer ${githubToken}`,
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "Sport-Cafe-Bot"
               },
@@ -1269,22 +1268,22 @@ export async function POST(req: NextRequest) {
               const screenshot = await captureWebsiteScreenshot();
               await replyLine(
                 replyToken,
-                '${BOT_TITLE}\n已成功為您恢復為上一版的版面狀態！',
+                `${BOT_TITLE}\n已成功為您恢復為上一版的版面狀態！`,
                 screenshot
               );
               continue;
             } else {
               if (redisClient) await redisClient.quit();
-              await replyLine(replyToken, '${BOT_TITLE}恢復失敗：更新 GitHub 檔案時發生錯誤。');
+              await replyLine(replyToken, `${BOT_TITLE}恢復失敗：更新 GitHub 檔案時發生錯誤。`);
               continue;
             }
           } else {
              if (redisClient) await redisClient.quit();
-             await replyLine(replyToken, '${BOT_TITLE}恢復失敗：找不到前一版的歷史紀錄。');
+             await replyLine(replyToken, `${BOT_TITLE}恢復失敗：找不到前一版的歷史紀錄。`);
              continue;
           }
         } catch {
-           await replyLine(replyToken, '${BOT_TITLE}恢復失敗：發生系統例外錯誤。');
+           await replyLine(replyToken, `${BOT_TITLE}恢復失敗：發生系統例外錯誤。`);
            continue;
         }
       }
@@ -1435,7 +1434,7 @@ export async function POST(req: NextRequest) {
       const codeKeywords = ["改", "換", "修改", "顏色", "排版", "按鈕", "版面", "設計", "字體", "背景", "風格", "調整", "增加", "刪除", "電腦版", "手機版"];
       const isCodeModification = codeKeywords.some((kw) => cleanText.includes(kw));
 
-      if (isCodeModification && GITHUB_TOKEN) {
+      if (isCodeModification && (process.env.GITHUB_TOKEN || '').trim()) {
         const result = await modifyFrontendCode(cleanText);
 
         if (result.success) {
