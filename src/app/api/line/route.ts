@@ -11,7 +11,7 @@ async function waitForDeployment(expectedText?: string) {
 
   for (let i = 0; i < 7; i++) {
     try {
-      const url = `https://sports-cafe-hub.vercel.app?_t=${Date.now()}`;
+      const url = `${SITE_URL}?_t=${Date.now()}`;
       const res = await fetch(url, { cache: "no-store" });
       const html = await res.text();
 
@@ -45,7 +45,13 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "yangfu51pmp";
-const GITHUB_REPO = process.env.GITHUB_REPO || "sports-cafe-hub";
+const GITHUB_REPO = process.env.GITHUB_REPO || "yuki-tomoya-shop";
+
+// 取得 SITE_URL 並清除可能的 Google 轉址與強制替換舊網址
+const SITE_URL = (process.env.SITE_URL || 'https://yuki-tomoya-shop.vercel.app')
+  .replace(/^https?:\/\/www\.google\.com\/url\?[^=]*=[^&]*&source=gmail&q=/i, '')
+  .replace(/.*sports-cafe-hub.*/i, 'https://yuki-tomoya-shop.vercel.app');
+
 
 // 提供給前端 page.tsx 即時讀取 Redis 標題、公告與連結的 GET 通道
 export async function GET(req: NextRequest) {
@@ -285,7 +291,7 @@ async function captureWebsiteScreenshot(overrideTitle?: string, overrideNotice?:
     if (poster) params.set("live_poster", poster);
     if (orientation) params.set("live_orientation", orientation);
 
-    const targetUrl = `https://sports-cafe-hub.vercel.app?${params.toString()}`;
+    const targetUrl = `${SITE_URL}?${params.toString()}`;
     const screenshotApi = `https://api.microlink.io?url=${encodeURIComponent(
       targetUrl
     )}&screenshot=true&viewport.isMobile=true&viewport.width=390&viewport.height=${height}&force=true`;
@@ -542,7 +548,7 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
   const fileSha = fileData.sha;
 
   const prompt = `你是一位精通 Tailwind CSS 與 Next.js 的資深前端工程師。
-以下是 Sport Café 官網首頁檔案：src/app/page.tsx。
+以下是 ユキ&トモヤ 日本選物代購 官網首頁檔案：src/app/page.tsx。
 
 【色彩庫與 Class 映射】：
 - 純金 / 香檳金: bg-[#C8A878] hover:bg-[#B89868] 或 bg-[#BA9868] hover:bg-[#a68455]
@@ -785,7 +791,7 @@ export async function POST(req: NextRequest) {
                 const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, undefined, undefined, 2400);
                 await replyLine(
                   replyToken,
-                  `✅ 已成功更新分類 ${awaitingCatUpload} 的專屬圖片！\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+                  `✅ 已成功更新分類 ${awaitingCatUpload} 的專屬圖片！\n\n官網已即時生效：\n${SITE_URL}`,
                   screenshot
                 );
                 continue;
@@ -874,13 +880,13 @@ export async function POST(req: NextRequest) {
 
       // 1. 群組過濾
       const isCallingBot =
-        rawText.includes("@Sport Cafe") ||
-        rawText.includes("@Sport") ||
+        rawText.includes("@ユキ&トモヤ管理助手") ||
+        rawText.includes("ユキ&トモヤ") ||
+        rawText.includes("@助手") ||
         rawText.includes("助手") ||
-        rawText.toLowerCase().includes("cafe") ||
-        rawText.includes("@ユキ&トモヤ") ||
-        rawText.includes("@日本代購管理助手") ||
-        rawText.includes("@Sport Cafe 管理助手");
+        rawText.includes("截圖") ||
+        rawText.includes("修改") ||
+        rawText.includes("幫助");
 
       if (isGroupChat && !isCallingBot) {
         continue;
@@ -904,7 +910,7 @@ export async function POST(req: NextRequest) {
             const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, newVideoUrl);
             await replyLine(
               replyToken,
-              `【Sport Cafe 管理助手】\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+              `【ユキ&トモヤ管理助手】\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
               screenshot
             );
             continue;
@@ -928,7 +934,7 @@ export async function POST(req: NextRequest) {
       const allowedAdmins = LINE_ADMIN_USER_ID.split(",").map((id) => id.trim()).filter(Boolean);
       if (allowedAdmins.length > 0 && !allowedAdmins.includes(userId)) {
         if (!isGroupChat) {
-          await replyLine(replyToken, "【Sport Cafe】抱歉，您尚未獲得管理員授權。");
+          await replyLine(replyToken, "【ユキ&トモヤ】抱歉，您尚未獲得管理員授權。");
         }
         continue;
       }
@@ -943,7 +949,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          "【Sport Cafe 管理助手】\n已為您即時抓取最新手機版官網畫面：\nhttps://sports-cafe-hub.vercel.app",
+          `【ユキ&トモヤ管理助手】\n已為您即時抓取最新手機版官網畫面：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -979,7 +985,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot();
           await replyLine(
             replyToken,
-            `【Sport Cafe 管理助手】\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+            `【ユキ&トモヤ管理助手】\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           );
           continue;
@@ -1000,7 +1006,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot(undefined, directNotice);
           await replyLine(
             replyToken,
-            `【Sport Cafe 管理助手】\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+            `【ユキ&トモヤ管理助手】\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           );
           continue;
@@ -1021,7 +1027,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot(newTitle, undefined);
           await replyLine(
             replyToken,
-            `【Sport Cafe 管理助手】\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+            `【ユキ&トモヤ管理助手】\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           );
           continue;
@@ -1041,7 +1047,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `【Sport Cafe 管理助手】\n已為您恢復網站預設背景！\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `【ユキ&トモヤ管理助手】\n已為您恢復網站預設背景！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1118,7 +1124,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, newVideoUrl);
         await replyLine(
           replyToken,
-          `【Sport Cafe 管理助手】\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `【ユキ&トモヤ管理助手】\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1137,7 +1143,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, undefined, newVideoTitle);
         await replyLine(
           replyToken,
-          `【Sport Cafe 管理助手】\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `【ユキ&トモヤ管理助手】\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1155,7 +1161,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, "hidden");
         await replyLine(
           replyToken,
-          `【Sport Cafe 管理助手】\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `【ユキ&トモヤ管理助手】\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1172,7 +1178,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `【Sport Cafe 管理助手】\n已恢復預設宣傳影片！\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `【ユキ&トモヤ管理助手】\n已恢復預設宣傳影片！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1262,22 +1268,22 @@ export async function POST(req: NextRequest) {
               const screenshot = await captureWebsiteScreenshot();
               await replyLine(
                 replyToken,
-                '【Sport Cafe 管理助手】\n已成功為您恢復為上一版的版面狀態！',
+                '【ユキ&トモヤ管理助手】\n已成功為您恢復為上一版的版面狀態！',
                 screenshot
               );
               continue;
             } else {
               if (redisClient) await redisClient.quit();
-              await replyLine(replyToken, '【Sport Cafe 管理助手】恢復失敗：更新 GitHub 檔案時發生錯誤。');
+              await replyLine(replyToken, '【ユキ&トモヤ管理助手】恢復失敗：更新 GitHub 檔案時發生錯誤。');
               continue;
             }
           } else {
              if (redisClient) await redisClient.quit();
-             await replyLine(replyToken, '【Sport Cafe 管理助手】恢復失敗：找不到前一版的歷史紀錄。');
+             await replyLine(replyToken, '【ユキ&トモヤ管理助手】恢復失敗：找不到前一版的歷史紀錄。');
              continue;
           }
         } catch {
-           await replyLine(replyToken, '【Sport Cafe 管理助手】恢復失敗：發生系統例外錯誤。');
+           await replyLine(replyToken, '【ユキ&トモヤ管理助手】恢復失敗：發生系統例外錯誤。');
            continue;
         }
       }
@@ -1294,7 +1300,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, newBgUrl);
         await replyLine(
           replyToken,
-          `【Sport Cafe 管理助手】\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `【ユキ&トモヤ管理助手】\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1418,7 +1424,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, newBgUrl);
         await replyLine(
           replyToken,
-          `已為您 AI 生成並更新網站背景！\n\n生成提示詞：${englishPrompt}\n\n官網已即時生效：\nhttps://sports-cafe-hub.vercel.app`,
+          `已為您 AI 生成並更新網站背景！\n\n生成提示詞：${englishPrompt}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         );
         continue;
@@ -1436,12 +1442,12 @@ export async function POST(req: NextRequest) {
           const newScreenshotUrl = await captureWebsiteScreenshot();
           await replyLine(
             replyToken,
-            `【Sport Cafe AI 工程師 (由 ${result.modelName || "AI"} 提供)】🛠️\n已成功為您調整網站代碼：${result.message}！\n\n⚡ 已自動推送到 GitHub 並完成部署，附上最新畫面！`,
+            `【ユキ&トモヤ AI 工程師 (由 ${result.modelName || "AI"} 提供)】🛠️\n已成功為您調整網站代碼：${result.message}！\n\n⚡ 已自動推送到 GitHub 並完成部署，附上最新畫面！`,
             newScreenshotUrl
           );
           continue;
         } else {
-          await replyLine(replyToken, `【Sport Cafe 管理助手】調整未完成：${result.message}`);
+          await replyLine(replyToken, `【ユキ&トモヤ管理助手】調整未完成：${result.message}`);
           continue;
         }
       }
@@ -1449,7 +1455,7 @@ export async function POST(req: NextRequest) {
       // 10. 一般引導回覆
       await replyLine(
         replyToken,
-        "【Sport Cafe 管理助手】\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
+        "【ユキ&トモヤ管理助手】\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
       );
     }
 

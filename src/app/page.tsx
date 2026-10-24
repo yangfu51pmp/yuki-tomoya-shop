@@ -13,7 +13,7 @@ export default function HomePage() {
   const [siteAnnouncementUrl, setSiteAnnouncementUrl] = useState("");
 
   // 動態綁定網站主視覺背景
-  const [siteHeroImage, setSiteHeroImage] = useState("https://images.unsplash.com/photo-1542051842830-0c984bc27546?q=80&w=1600&auto=format&fit=crop"); // 東京街景
+  const [siteHeroImage, setSiteHeroImage] = useState(""); // 東京街景
 
   // 動態綁定影片區塊
   const [sitePromoVideo, setSitePromoVideo] = useState("https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-large.mp4");
@@ -221,10 +221,14 @@ export default function HomePage() {
         <section
           className="relative h-[520px] sm:h-[600px] flex flex-col justify-center items-center text-center transition-all duration-700 overflow-hidden bg-[#F2F2F2]"
         >
-          {siteHeroImage?.match(/\.(mp4|webm)(\?.*)?$/i) ? (
-            <video src={siteHeroImage} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-0" />
+          {siteHeroImage ? (
+            siteHeroImage.match(/\.(mp4|webm)(\?.*)?$/i) ? (
+              <video src={siteHeroImage} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-0" />
+            ) : (
+              <img src={siteHeroImage} alt="Hero Background" className="absolute inset-0 w-full h-full object-cover z-0" />
+            )
           ) : (
-            <img src={siteHeroImage} alt="Hero Background" className="absolute inset-0 w-full h-full object-cover z-0" />
+            <div className="absolute inset-0 w-full h-full z-0 bg-gradient-to-br from-[#E6F3FA] to-[#78C4EC] [background-image:linear-gradient(to_right,rgba(255,255,255,0.4)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.4)_1px,transparent_1px)] bg-[size:24px_24px]" />
           )}
 
           <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px] z-10" />

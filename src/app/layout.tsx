@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sport Café Hub｜無人智能咖啡廳 ✕ 專業運動裝備",
+  title: "ユキ&トモヤ 日本選物代購",
   description: "空間、咖啡與你的訓練日常。無人自助手沖、即時席位與運動裝備借測。",
 };
 
