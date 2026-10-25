@@ -148,6 +148,18 @@ export default function AiVideoPlayer({
   }
 
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const rawVideoArrayBufferRef = useRef<ArrayBuffer | null>(null);
+  const decodedAudioBufferRef = useRef<AudioBuffer | null>(null);
+
+  useEffect(() => {
+    if (!videoUrl) return;
+    fetch(videoUrl)
+      .then(res => res.arrayBuffer())
+      .then(buf => { rawVideoArrayBufferRef.current = buf; })
+      .catch(() => {});
+  }, [videoUrl]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
@@ -445,18 +457,74 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
         const canvasStream = canvas.captureStream(30);
 
+        // --- Synchronous Gesture Unlock FIRST ---
+        // Initialize/resume audioCtx
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (!audioContextRef.current && AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+        }
+        const actx = audioContextRef.current;
+        if (!actx) throw new Error("AudioContext not supported");
+        if (actx.state === 'suspended') {
+          actx.resume();
+        }
+
+        // Create MediaStreamDestination
+        const audioDest = actx.createMediaStreamDestination();
+        exportDestRef.current = audioDest;
+
+        // Start silent keep-alive oscillator synchronously
+        const keepAliveOsc = actx.createOscillator();
+        const keepAliveGain = actx.createGain();
+        keepAliveGain.gain.value = 0.0001;
+        keepAliveOsc.connect(keepAliveGain);
+        keepAliveGain.connect(audioDest);
+        keepAliveOsc.start();
+
+        // Set video.muted = true, time=0 and play synchronously
+        v.muted = true;
+        v.currentTime = 0;
+        const playPromise = v.play();
+        // ----------------------------------------
+
+        await playPromise;
+
+        // Decode audio if needed
+        if (!decodedAudioBufferRef.current && rawVideoArrayBufferRef.current) {
+          decodedAudioBufferRef.current = await actx.decodeAudioData(rawVideoArrayBufferRef.current.slice(0));
+        }
+
+        // Reset video to 0 to sync audio and video
+        v.currentTime = 0;
+
+        let sourceNode: AudioBufferSourceNode | null = null;
+        if (decodedAudioBufferRef.current) {
+           sourceNode = actx.createBufferSource();
+           sourceNode.buffer = decodedAudioBufferRef.current;
+           sourceNode.connect(audioDest);
+           sourceNode.connect(actx.destination);
+           sourceNode.start(0, 0);
+        }
+
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioDest.stream.getAudioTracks()
+        ]);
+
         const chunks: BlobPart[] = [];
         let mediaRecorder: MediaRecorder;
-        const selectedMime = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
 
         try {
-            mediaRecorder = selectedMime
-                ? new MediaRecorder(canvasStream, { mimeType: selectedMime })
-                : new MediaRecorder(canvasStream);
+            mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/mp4' });
             mediaRecorder.start(200);
-        } catch (err1) {
-            mediaRecorder = new MediaRecorder(canvasStream);
-            mediaRecorder.start(200);
+        } catch {
+            try {
+                mediaRecorder = new MediaRecorder(combinedStream);
+                mediaRecorder.start(200);
+            } catch {
+                mediaRecorder = new MediaRecorder(canvasStream);
+                mediaRecorder.start(200);
+            }
         }
 
         mediaRecorder.ondataavailable = (e) => {
@@ -464,20 +532,12 @@ const renderSubtitleText = (text: string, highlight: string) => {
         };
 
         const recordingPromise = new Promise<Blob>((resolve) => {
-            mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: mediaRecorder.mimeType || 'video/mp4' }));
+            mediaRecorder.onstop = () => {
+                if (sourceNode) sourceNode.stop();
+                keepAliveOsc.stop();
+                resolve(new Blob(chunks, { type: mediaRecorder.mimeType || 'video/mp4' }));
+            };
         });
-
-        // Fast forward export wait for 0
-        v.currentTime = 0;
-        await new Promise<void>((r) => {
-            const onSeeked = () => { v.removeEventListener('seeked', onSeeked); r(); };
-            v.addEventListener('seeked', onSeeked);
-            if (v.currentTime === 0) r();
-        });
-        await new Promise(r => setTimeout(r, 150));
-
-        v.muted = true;
-        await v.play();
 
         const containerRect = containerRef.current.getBoundingClientRect();
         const scaleX = vw / containerRect.width;
@@ -556,198 +616,270 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     }
 
                     // --- Active Events ---
+                    const isOutro = resolvedScript.outro && duration > 10 && cTime >= duration - 3.8;
                     const activeEvts = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
                     for (const evt of activeEvts) {
                         ctx.textAlign = 'left';
                         ctx.textBaseline = 'middle';
 
-                        const eW = 320 * scaleX;
-                        const eH = 100 * scaleY;
-                        let eX = cx - eW/2;
-                        let eY = cy - eH/2;
+                        const cardW = vw * 0.42;
+                        let cardH = vh * 0.22;
 
-                        if (evt.side === 'left') { eX = 20 * scaleX; }
-                        else if (evt.side === 'right') { eX = vw - eW - 20 * scaleX; }
+                        let eX = cx - cardW/2;
+                        let eY = vh * 0.14; // Default upper Y for cards
+
+                        if (evt.side === 'left') { eX = vw * 0.03; }
+                        else if (evt.side === 'right') { eX = vw * 0.55; }
 
                         if (evt.type === 'qa_bubble') {
-                            eY = vh * 0.2;
-                            ctx.fillStyle = "white";
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
                             ctx.shadowColor = "rgba(0,0,0,0.2)";
-                            ctx.shadowBlur = 20 * scaleY;
-                            drawRoundedRect(ctx, eX, eY, eW, eH, 16 * Math.min(scaleX, scaleY));
+                            ctx.shadowBlur = 10 * scaleY;
+                            drawRoundedRect(ctx, eX, eY, cardW, cardH, 16 * Math.min(scaleX, scaleY));
                             ctx.shadowBlur = 0;
 
                             ctx.fillStyle = "#78C4EC";
-                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                            ctx.fillText(`● ${evt.author || 'Q&A'}`, eX + 20 * scaleX, eY + 30 * scaleY);
+                            ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                            ctx.fillText(`● ${evt.author || 'Q&A'}`, eX + vw * 0.02, eY + cardH * 0.3);
 
                             ctx.fillStyle = "#333";
-                            ctx.font = `bold ${18 * scaleY}px sans-serif`;
-                            ctx.fillText(evt.title || evt.question || '', eX + 20 * scaleX, eY + 65 * scaleY);
+                            ctx.font = `bold ${vh * 0.032}px sans-serif`;
+                            const tY = eY + cardH * 0.65;
+                            const maxW = cardW * 0.9;
+                            const text = evt.title || evt.question || '';
+                            let textToDraw = text;
+                            while (ctx.measureText(textToDraw).width > maxW && textToDraw.length > 0) {
+                               textToDraw = textToDraw.substring(0, textToDraw.length - 1);
+                            }
+                            if (textToDraw !== text) textToDraw += '...';
+                            ctx.fillText(textToDraw, eX + vw * 0.02, tY);
                         } else if (evt.type === 'myth_buster') {
-                            eY = cy - eH/2;
-                            ctx.fillStyle = "white";
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
                             ctx.strokeStyle = "red";
                             ctx.lineWidth = 4 * scaleY;
-                            drawRoundedRect(ctx, eX, eY, eW, eH, 16 * Math.min(scaleX, scaleY));
+                            drawRoundedRect(ctx, eX, eY, cardW, cardH, 16 * Math.min(scaleX, scaleY));
                             ctx.stroke();
 
                             ctx.fillStyle = "#333";
-                            ctx.font = `900 ${22 * scaleY}px sans-serif`;
+                            ctx.font = `900 ${vh * 0.032}px sans-serif`;
                             ctx.textAlign = "center";
-                            ctx.fillText(evt.title, eX + eW/2, eY + 40 * scaleY);
+                            ctx.fillText(evt.title, eX + cardW/2, eY + cardH * 0.4);
 
                             if (evt.subtitle) {
-                                ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                                ctx.fillText(evt.subtitle, eX + eW/2, eY + 70 * scaleY);
+                                ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                                ctx.fillStyle = "#666";
+                                ctx.fillText(evt.subtitle, eX + cardW/2, eY + cardH * 0.7);
                             }
-                        } else if (evt.type === 'big_impact') {
-                            ctx.fillStyle = "white";
-                            ctx.font = `900 ${60 * scaleY}px sans-serif`;
-                            ctx.textAlign = "center";
-                            ctx.shadowColor = "rgba(0,0,0,0.8)";
-                            ctx.shadowBlur = 10;
-                            ctx.fillText(evt.title, cx, cy);
+                        } else if (evt.type === 'progress_card' || evt.type === 'checklist_card') {
+                            cardH = vh * 0.30;
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+                            ctx.shadowColor = "rgba(0,0,0,0.2)";
+                            ctx.shadowBlur = 10 * scaleY;
+                            drawRoundedRect(ctx, eX, eY, cardW, cardH, 16 * Math.min(scaleX, scaleY));
                             ctx.shadowBlur = 0;
 
-                            if (evt.strikeThrough) {
-                                const m = ctx.measureText(evt.title);
-                                ctx.strokeStyle = "red";
-                                ctx.lineWidth = 8 * scaleY;
-                                ctx.beginPath();
-                                ctx.moveTo(cx - m.width/2, cy);
-                                ctx.lineTo(cx + m.width/2, cy);
-                                ctx.stroke();
-                            }
-                        } else if (evt.type === 'target_focus') {
-                            ctx.fillStyle = "rgba(255,255,255,0.9)";
-                            drawRoundedRect(ctx, cx - 100 * scaleX, cy + 60 * scaleY, 200 * scaleX, 30 * scaleY, 4 * scaleY);
+                            ctx.fillStyle = "#78C4EC";
+                            ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                            ctx.fillText(evt.badge || "CHECKLIST", eX + vw * 0.02, eY + cardH * 0.2);
+
                             ctx.fillStyle = "#333";
-                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                            ctx.textAlign = "center";
-                            ctx.fillText(evt.title, cx, cy + 75 * scaleY);
+                            ctx.font = `bold ${vh * 0.032}px sans-serif`;
+                            ctx.fillText(evt.title, eX + vw * 0.02, eY + cardH * 0.45);
+
+                            if (evt.type === 'checklist_card' && evt.items) {
+                                ctx.fillStyle = "#444";
+                                ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                                evt.items.forEach((item, i) => {
+                                    if (i < 3) {
+                                        ctx.fillText(`- ${item}`, eX + vw * 0.02, eY + cardH * 0.65 + i * (vh * 0.035));
+                                    }
+                                });
+                            }
+                        } else if (evt.type === 'big_impact') {
+                            ctx.textAlign = 'center';
+                            ctx.font = `900 ${vh * 0.1}px sans-serif`;
+                            ctx.fillStyle = '#FF3B30';
+                            ctx.fillText(evt.title, cx, cy);
+                            ctx.lineWidth = 8;
+                            ctx.strokeStyle = 'white';
+                            ctx.strokeText(evt.title, cx, cy);
+                        } else if (evt.type === 'warning_tape') {
+                            const barY = vh * 0.15;
+                            const barH = vh * 0.11;
+                            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                            ctx.fillRect(0, barY, vw, barH);
+                            ctx.strokeStyle = '#facc15';
+                            ctx.lineWidth = 4;
+                            ctx.strokeRect(0, barY, vw, barH);
+
+                            ctx.fillStyle = 'red';
+                            ctx.textAlign = 'center';
+                            ctx.font = `900 ${vh * 0.04}px sans-serif`;
+                            ctx.fillText('⚠️ ' + evt.title, cx, barY + barH * 0.4);
+                            if (evt.subtitle) {
+                                ctx.fillStyle = '#facc15';
+                                ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                                ctx.fillText(evt.subtitle, cx, barY + barH * 0.75);
+                            }
                         } else if (evt.type === 'numbered_pill') {
-                            const pW = 200 * scaleX;
-                            const pH = 40 * scaleY;
-                            const pY = 0.25 * vh + (allEvents.indexOf(evt) % 4) * 50 * scaleY;
-                            let pX = evt.side === 'left' ? 20 * scaleX : vw - pW - 20 * scaleX;
+                            const pW = vw * 0.42;
+                            const pH = vh * 0.09;
+                            let pX = cx - pW/2;
+                            const num = evt.number || 1;
 
-                            ctx.fillStyle = "rgba(255,255,255,0.95)";
-                            drawRoundedRect(ctx, pX, pY, pW, pH, 20 * scaleY);
+                            // 1 & 3 on left, 2 & 4 on right
+                            if (num === 1 || num === 3) pX = vw * 0.03;
+                            else if (num === 2 || num === 4) pX = vw * 0.55;
 
+                            let pY = vh * 0.16;
+                            if (num === 3 || num === 4) pY = vh * 0.29;
+
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+                            ctx.strokeStyle = "rgba(120, 196, 236, 0.5)";
+                            ctx.lineWidth = 2;
+                            drawRoundedRect(ctx, pX, pY, pW, pH, pH / 2);
+                            ctx.stroke();
+
+                            // circle
+                            const r = pH * 0.35;
                             ctx.fillStyle = "#78C4EC";
                             ctx.beginPath();
-                            ctx.arc(pX + 20 * scaleX, pY + 20 * scaleY, 14 * scaleY, 0, Math.PI * 2);
+                            ctx.arc(pX + pH*0.5, pY + pH*0.5, r, 0, Math.PI * 2);
                             ctx.fill();
 
                             ctx.fillStyle = "white";
-                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
                             ctx.textAlign = "center";
-                            ctx.fillText(String(evt.number || 1), pX + 20 * scaleX, pY + 21 * scaleY);
+                            ctx.font = `900 ${vh * 0.035}px sans-serif`;
+                            ctx.fillText(num.toString(), pX + pH*0.5, pY + pH*0.5);
 
-                            ctx.fillStyle = "#333";
+                            ctx.fillStyle = "#555";
                             ctx.textAlign = "left";
-                            ctx.fillText(evt.title, pX + 45 * scaleX, pY + 21 * scaleY);
-                        } else if (evt.type === 'icon_pill') {
-                            const pW = 220 * scaleX;
-                            const pH = 40 * scaleY;
-                            const pY = 0.1 * vh + (allEvents.indexOf(evt) % 4) * 50 * scaleY;
-                            let pX = evt.side === 'left' ? 20 * scaleX : vw - pW - 20 * scaleX;
+                            ctx.font = `bold ${vh * 0.03}px sans-serif`;
+                            ctx.fillText(evt.title, pX + pH*1.1, pY + pH*0.5);
+                        } else if (evt.type === 'target_focus') {
+                           ctx.strokeStyle = 'red';
+                           ctx.lineWidth = 4;
+                           ctx.setLineDash([15, 15]);
+                           ctx.beginPath();
+                           ctx.arc(cx, cy, 60 * scaleX, 0, 2*Math.PI);
+                           ctx.stroke();
+                           ctx.setLineDash([]);
 
-                            ctx.fillStyle = "rgba(255,255,255,0.95)";
-                            drawRoundedRect(ctx, pX, pY, pW, pH, 20 * scaleY);
+                           ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                           const tw = ctx.measureText(evt.title).width + 20;
+                           drawRoundedRect(ctx, cx - tw/2, cy + 80 * scaleY, tw, 30 * scaleY, 4);
+                           ctx.fillStyle = "#333";
+                           ctx.textAlign = "center";
+                           ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                           ctx.fillText(evt.title, cx, cy + 95 * scaleY);
+                        }
+                    }
+                    // --- Subtitles ---
+                    const sub = resolvedScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
+                    if (isOutro && resolvedScript.outro) {
+                        ctx.fillStyle = "rgba(0,0,0,0.85)";
+                        ctx.fillRect(0, 0, vw, vh);
 
-                            ctx.fillStyle = "#333";
-                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                            ctx.textAlign = "left";
-                            ctx.fillText(`${evt.icon || ''} ${evt.title}`, pX + 20 * scaleX, pY + 21 * scaleY);
-                        } else if (evt.type === 'warning_tape') {
-                            ctx.fillStyle = "rgba(0,0,0,0.8)";
-                            ctx.fillRect(0, vh * 0.4, vw, 60 * scaleY);
-                            ctx.fillStyle = "#facc15";
-                            ctx.fillRect(0, vh * 0.4, vw, 4 * scaleY);
-                            ctx.fillRect(0, vh * 0.4 + 56 * scaleY, vw, 4 * scaleY);
+                        const cardW = vw * 0.84;
+                        const cardH = vh * 0.86;
+                        const cardX = vw * 0.08;
+                        const cardY = vh * 0.07;
 
-                            ctx.fillStyle = "red";
-                            ctx.font = `900 ${20 * scaleY}px sans-serif`;
-                            ctx.textAlign = "center";
-                            ctx.fillText(`⚠️ ${evt.title}`, cx, vh * 0.4 + 30 * scaleY);
-                        } else if (evt.type === 'progress_card') {
-                            const pW = 300 * scaleX;
-                            const pH = 80 * scaleY;
-                            const pY = vh - pH - 100 * scaleY;
+                        ctx.fillStyle = "white";
+                        drawRoundedRect(ctx, cardX, cardY, cardW, cardH, vh * 0.04);
 
-                            ctx.fillStyle = "rgba(255,255,255,0.9)";
-                            drawRoundedRect(ctx, cx - pW/2, pY, pW, pH, 12 * scaleY);
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
 
-                            ctx.fillStyle = "#333";
-                            ctx.font = `800 ${16 * scaleY}px sans-serif`;
-                            ctx.textAlign = "left";
-                            ctx.fillText(evt.title, cx - pW/2 + 20 * scaleX, pY + 30 * scaleY);
-                        } else if (evt.type === 'checklist_card') {
-                            const cW = 320 * scaleX;
-                            const cH = 160 * scaleY;
-                            const cY = vh - cH - 40 * scaleY;
+                        // Badge
+                        ctx.fillStyle = "#78C4EC";
+                        ctx.font = `bold ${vh * 0.028}px sans-serif`;
+                        ctx.fillText(resolvedScript.outro.badge, cx, vh * 0.14);
 
-                            ctx.fillStyle = "rgba(255,255,255,0.95)";
-                            drawRoundedRect(ctx, cx - cW/2, cY, cW, cH, 16 * scaleY);
+                        // Title
+                        ctx.fillStyle = "#0F172A";
+                        ctx.font = `900 ${vh * 0.052}px sans-serif`;
+                        ctx.fillText(resolvedScript.outro.title, cx, vh * 0.25);
 
-                            ctx.fillStyle = "#78C4EC";
-                            ctx.font = `800 ${16 * scaleY}px sans-serif`;
-                            ctx.textAlign = "left";
-                            ctx.fillText(`✓ ${evt.title}`, cx - cW/2 + 20 * scaleX, cY + 30 * scaleY);
+                        // Points
+                        ctx.fillStyle = "#333";
+                        let ptSize = vh * 0.031;
+                        ctx.font = `bold ${ptSize}px sans-serif`;
 
-                            ctx.fillStyle = "#444";
-                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                            (evt.items || []).forEach((item, i) => {
-                                ctx.fillText(`■ ${item}`, cx - cW/2 + 20 * scaleX, cY + 70 * scaleY + i * 25 * scaleY);
-                            });
+                        ctx.textAlign = 'left';
+                        const points = resolvedScript.outro.points || [];
+                        const yOffsets = [0.38, 0.49, 0.60];
+                        points.forEach((pt, i) => {
+                            if (i < 3) {
+                                let cSize = ptSize;
+                                ctx.font = `bold ${cSize}px sans-serif`;
+                                while (ctx.measureText(pt).width > cardW * 0.88 && cSize > 10) {
+                                    cSize -= 1;
+                                    ctx.font = `bold ${cSize}px sans-serif`;
+                                }
+                                const tw = ctx.measureText(pt).width;
+                                ctx.fillText(pt, cx - tw/2, vh * yOffsets[i]);
+                            }
+                        });
+
+                        // Credit
+                        ctx.textAlign = 'center';
+                        ctx.fillStyle = "#475569";
+                        ctx.font = `bold ${vh * 0.028}px sans-serif`;
+                        ctx.fillText(resolvedScript.outro.credit, cx, vh * 0.73);
+
+                        // CTA Bar
+                        if (resolvedScript.outro.cta) {
+                            const ctaW = cardW * 0.9;
+                            const ctaH = vh * 0.08;
+                            const ctaX = cx - ctaW/2;
+                            const ctaY = vh * 0.80;
+                            ctx.fillStyle = "#0284C7";
+                            drawRoundedRect(ctx, ctaX, ctaY, ctaW, ctaH, ctaH/2);
+
+                            ctx.fillStyle = "white";
+                            ctx.font = `bold ${vh * 0.027}px sans-serif`;
+                            ctx.fillText(resolvedScript.outro.cta, cx, ctaY + ctaH/2);
                         }
                     }
 
-                    // --- Outro ---
-                    const isOutro = resolvedScript.outro && duration > 10 && cTime >= duration - 3.8;
-                    if (isOutro && resolvedScript.outro) {
-                        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-                        ctx.fillRect(0, 0, vw, vh);
-
-                        const oW = 340 * scaleX;
-                        const oH = 340 * scaleY;
-                        ctx.fillStyle = "white";
-                        drawRoundedRect(ctx, cx - oW/2, cy - oH/2, oW, oH, 24 * scaleY);
-
-                        ctx.fillStyle = "#333";
-                        ctx.font = `900 ${24 * scaleY}px sans-serif`;
-                        ctx.textAlign = "center";
-                        ctx.fillText(resolvedScript.outro.title, cx, cy - oH/2 + 60 * scaleY);
-
-                        ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                        ctx.textAlign = "left";
-                        (resolvedScript.outro.points || []).forEach((pt, i) => {
-                            ctx.fillText(pt, cx - oW/2 + 20 * scaleX, cy - oH/2 + 120 * scaleY + i * 35 * scaleY);
-                        });
-                    }
-
                     // --- Subtitles ---
-                    const sub = resolvedScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
                     if (sub && !isOutro && !(resolvedScript.cover && cTime <= 3.5)) {
-                        ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
-                        const padX = 20 * scaleX;
-                        const padY = 10 * scaleY;
-                        ctx.font = `bold ${16 * scaleY}px sans-serif`;
-                        const m = ctx.measureText(sub.text);
-                        const rectW = m.width + padX * 2;
-                        const rectH = 16 * scaleY + padY * 2;
+                        const fullText = sub.text;
 
-                        const rx = (vw - rectW) / 2;
-                        const ry = vh - rectH - 40 * scaleY;
+                        let subFontSize = Math.round(vh * 0.042);
+                        ctx.font = `bold ${subFontSize}px sans-serif`;
+                        while (ctx.measureText(fullText).width > vw * 0.86 && subFontSize > 14) {
+                            subFontSize -= 1;
+                            ctx.font = `bold ${subFontSize}px sans-serif`;
+                        }
 
-                        drawRoundedRect(ctx, rx, ry, rectW, rectH, rectH / 2);
+                        const textW = ctx.measureText(fullText).width;
+                        const subW = Math.min(vw * 0.92, textW + subFontSize * 2.2);
+                        const subH = subFontSize * 2.0;
+                        const subX = (vw - subW) / 2;
+                        const subY = vh * 0.88;
 
-                        ctx.fillStyle = "#ffffff";
-                        ctx.textAlign = "center";
-                        ctx.textBaseline = "middle";
-                        ctx.fillText(sub.text, vw / 2, ry + rectH / 2);
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                        drawRoundedRect(ctx, subX, subY, subW, subH, vh * 0.03);
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#ffffff';
+                        const textX = subX + (subW - textW) / 2;
+                        ctx.textAlign = 'left';
+                        ctx.fillText(fullText, textX, subY + subH / 2);
+
+                        if (sub.highlight) {
+                            const hlIdx = fullText.indexOf(sub.highlight);
+                            if (hlIdx !== -1) {
+                                const preText = fullText.substring(0, hlIdx);
+                                const preW = ctx.measureText(preText).width;
+                                ctx.fillStyle = sub.color === 'amber' ? '#FBBF24' : sub.color === 'coral' ? '#FF6B6B' : '#78C4EC';
+                                ctx.fillText(sub.highlight, textX + preW, subY + subH / 2);
+                            }
+                        }
                     }
                 }
             } catch (err) {
@@ -1169,7 +1301,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出完整 MP4 影片 (v5.1)
+                      🎬 匯出有聲 MP4 影片 (v5.2)
                     </button>
                   )}
                 </div>
