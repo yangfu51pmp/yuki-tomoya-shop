@@ -422,11 +422,36 @@ export default function AiVideoPlayer({
      }
   }
 
+  const coverEnd = 3.2; // 0.0 - 3.2s
+  const outroStart = (videoRef.current?.duration || 39) > 10 ? (videoRef.current?.duration || 39) - 3.5 : 999;
+
+  let rawActiveEvents = allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end);
+
+  // 1. Strict Intro / Outro Isolation
+  if (currentTime <= coverEnd + 0.2 || currentTime >= outroStart - 0.2) {
+      rawActiveEvents = [];
+  }
+
+  // 2. Automatic Anti-Overlap Layout Guard Engine
+  const cards = rawActiveEvents.filter(e => ['qa_bubble', 'myth_buster', 'progress_card', 'checklist_card', 'target_focus'].includes(e.type));
+  const activeCardsLeft = cards.filter(e => e.side === 'left');
+  const activeCardsRight = cards.filter(e => e.side === 'right');
+
+  let finalActiveEvents = [...rawActiveEvents];
+
+  // If a large card is active on a side, temporarily hide numbered_pills on that SAME side
+  if (activeCardsLeft.length > 0) {
+      finalActiveEvents = finalActiveEvents.filter(e => !(e.type === 'numbered_pill' && e.side === 'left'));
+  }
+  if (activeCardsRight.length > 0) {
+      finalActiveEvents = finalActiveEvents.filter(e => !(e.type === 'numbered_pill' && e.side === 'right'));
+  }
+
   const activeEffects = {
-    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 3.5,
+    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= coverEnd,
     subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
-    events: allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end),
-    outro: resolvedScript?.outro && (videoRef.current?.duration || 39) > 10 && currentTime >= (videoRef.current?.duration || 39) - 3.3,
+    events: finalActiveEvents,
+    outro: resolvedScript?.outro && currentTime >= outroStart,
   };
 
   const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
@@ -450,7 +475,7 @@ export default function AiVideoPlayer({
     const s = Math.floor(time % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
-const renderSubtitleText = (text: string, highlight: string) => {
+const renderSubtitleText = (text: string, highlight?: string, color?: string) => {
     if (!highlight) return text;
     const parts = text.split(highlight);
     return (
@@ -638,7 +663,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         ctx.fillStyle = "#6d6d6d";
                         ctx.textAlign = "left";
                         ctx.textBaseline = "middle";
-                        ctx.font = `bold ${vh * 0.035}px sans-serif`;
+                        ctx.font = `bold ${vh * 0.035}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         ctx.fillText("✨ ユキ&トモヤ｜日本實拍", vw * 0.03 + vw * 0.02, vh * 0.05 + vh * 0.0375);
                         ctx.textBaseline = "alphabetic";
                     }
@@ -649,12 +674,12 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         ctx.fillRect(0, 0, vw, 40 * scaleY);
 
                         ctx.fillStyle = "#ffffff";
-                        ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                        ctx.font = `bold ${14 * scaleY}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         ctx.textAlign = "center";
                         ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, cx, 20 * scaleY);
 
                         ctx.fillStyle = "#ffffff";
-                        ctx.font = `bold ${36 * scaleY}px sans-serif`;
+                        ctx.font = `bold ${36 * scaleY}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         ctx.textAlign = "center";
                         ctx.shadowColor = "rgba(0,0,0,0.5)";
                         ctx.shadowBlur = 10;
@@ -662,7 +687,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         ctx.shadowBlur = 0;
 
                         if (resolvedScript.cover.subtitle) {
-                            ctx.font = `bold ${16 * scaleY}px sans-serif`;
+                            ctx.font = `bold ${16 * scaleY}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(resolvedScript.cover.subtitle, cx, cy + 10 * scaleY);
                         }
                     }
@@ -691,11 +716,11 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             ctx.shadowBlur = 0;
 
                             ctx.fillStyle = "#78C4EC";
-                            ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                            ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(`● ${evt.author || 'Q&A'}`, eX + vw * 0.02, eY + cardH * 0.3);
 
                             ctx.fillStyle = "#333";
-                            ctx.font = `bold ${vh * 0.032}px sans-serif`;
+                            ctx.font = `bold ${vh * 0.032}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             const tY = eY + cardH * 0.65;
                             const maxW = cardW * 0.9;
                             const text = evt.title || evt.question || '';
@@ -706,19 +731,17 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             if (textToDraw !== text) textToDraw += '...';
                             ctx.fillText(textToDraw, eX + vw * 0.02, tY);
                         } else if (evt.type === 'myth_buster') {
-                            ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-                            ctx.strokeStyle = "red";
-                            ctx.lineWidth = 4 * scaleY;
-                            drawRoundedRect(ctx, eX, eY, cardW, cardH, 16 * Math.min(scaleX, scaleY));
-                            ctx.stroke();
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.98)";
+drawRoundedRect(ctx, eX, eY, cardW, cardH, 16 * Math.min(scaleX, scaleY));
+ctx.fill();
 
                             ctx.fillStyle = "#333";
-                            ctx.font = `900 ${vh * 0.032}px sans-serif`;
+                            ctx.font = `700 ${vh * 0.032}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.textAlign = "center";
                             ctx.fillText(evt.title, eX + cardW/2, eY + cardH * 0.4);
 
                             if (evt.subtitle) {
-                                ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                                ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                                 ctx.fillStyle = "#666";
                                 ctx.fillText(evt.subtitle, eX + cardW/2, eY + cardH * 0.7);
                             }
@@ -731,16 +754,16 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             ctx.shadowBlur = 0;
 
                             ctx.fillStyle = "#78C4EC";
-                            ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                            ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(evt.badge || "CHECKLIST", eX + vw * 0.02, eY + cardH * 0.2);
 
                             ctx.fillStyle = "#333";
-                            ctx.font = `bold ${vh * 0.032}px sans-serif`;
+                            ctx.font = `bold ${vh * 0.032}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(evt.title, eX + vw * 0.02, eY + cardH * 0.45);
 
                             if (evt.type === 'checklist_card' && evt.items) {
                                 ctx.fillStyle = "#444";
-                                ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                                ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                                 evt.items.forEach((item, i) => {
                                     if (i < 3) {
                                         ctx.fillText(`- ${item}`, eX + vw * 0.02, eY + cardH * 0.65 + i * (vh * 0.035));
@@ -749,28 +772,23 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             }
                         } else if (evt.type === 'big_impact') {
                             ctx.textAlign = 'center';
-                            ctx.font = `900 ${vh * 0.1}px sans-serif`;
+                            ctx.font = `700 ${vh * 0.1}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillStyle = '#FF3B30';
                             ctx.fillText(evt.title, cx, cy);
-                            ctx.lineWidth = 8;
-                            ctx.strokeStyle = 'white';
-                            ctx.strokeText(evt.title, cx, cy);
-                        } else if (evt.type === 'warning_tape') {
+                                                                                                            } else if (evt.type === 'warning_tape') {
                             const barY = vh * 0.15;
                             const barH = vh * 0.11;
                             ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
                             ctx.fillRect(0, barY, vw, barH);
-                            ctx.strokeStyle = '#facc15';
-                            ctx.lineWidth = 4;
-                            ctx.strokeRect(0, barY, vw, barH);
+                                                                                    ctx.strokeRect(0, barY, vw, barH);
 
                             ctx.fillStyle = 'red';
                             ctx.textAlign = 'center';
-                            ctx.font = `900 ${vh * 0.04}px sans-serif`;
+                            ctx.font = `700 ${vh * 0.04}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText('⚠️ ' + evt.title, cx, barY + barH * 0.4);
                             if (evt.subtitle) {
                                 ctx.fillStyle = '#facc15';
-                                ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                                ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                                 ctx.fillText(evt.subtitle, cx, barY + barH * 0.75);
                             }
                         } else if (evt.type === 'numbered_pill') {
@@ -786,11 +804,9 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             let pY = vh * 0.16;
                             if (num === 3 || num === 4) pY = vh * 0.29;
 
-                            ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-                            ctx.strokeStyle = "rgba(120, 196, 236, 0.5)";
-                            ctx.lineWidth = 2;
-                            drawRoundedRect(ctx, pX, pY, pW, pH, pH / 2);
-                            ctx.stroke();
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.98)";
+drawRoundedRect(ctx, pX, pY, pW, pH, pH / 2);
+ctx.fill();
 
                             // circle
                             const r = pH * 0.35;
@@ -801,27 +817,27 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
                             ctx.fillStyle = "white";
                             ctx.textAlign = "center";
-                            ctx.font = `900 ${vh * 0.035}px sans-serif`;
+                            ctx.font = `700 ${vh * 0.035}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(num.toString(), pX + pH*0.5, pY + pH*0.5);
 
                             ctx.fillStyle = "#555";
                             ctx.textAlign = "left";
-                            ctx.font = `bold ${vh * 0.03}px sans-serif`;
+                            ctx.font = `bold ${vh * 0.03}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(evt.title, pX + pH*1.1, pY + pH*0.5);
                         } else if (evt.type === 'target_focus') {
                            const tX = vw * 0.32;
                            const tY = vh * 0.36;
                            const radius1 = vh * 0.045;
                            const radius2 = vh * 0.025;
-
-                           ctx.strokeStyle = 'red';
-                           ctx.lineWidth = 3;
+                           ctx.strokeStyle = '#EF4444';
+                           ctx.lineWidth = 2;
                            ctx.setLineDash([10, 5]);
                            ctx.beginPath();
                            ctx.arc(tX, tY, radius1, 0, 2*Math.PI);
                            ctx.stroke();
 
-                           ctx.strokeStyle = '#78C4EC';
+                           ctx.strokeStyle = '#38BDF8';
+                           ctx.lineWidth = 2;
                            ctx.setLineDash([]);
                            ctx.beginPath();
                            ctx.arc(tX, tY, radius2, 0, 2*Math.PI);
@@ -834,7 +850,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
                            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
                            const pillText = `🎯 ${evt.title}｜${evt.subtitle}`;
-                           ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                           ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                            const tw = ctx.measureText(pillText).width + 20;
                            drawRoundedRect(ctx, tX + radius1 + 10, tY - vh * 0.02, tw, vh * 0.04, vh * 0.01);
 
@@ -864,18 +880,18 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
                         // Badge
                         ctx.fillStyle = "#78C4EC";
-                        ctx.font = `bold ${vh * 0.028}px sans-serif`;
+                        ctx.font = `bold ${vh * 0.028}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         ctx.fillText(resolvedScript.outro.badge, cx, vh * 0.14);
 
                         // Title
                         ctx.fillStyle = "#0F172A";
-                        ctx.font = `900 ${vh * 0.052}px sans-serif`;
+                        ctx.font = `700 ${vh * 0.052}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         ctx.fillText(resolvedScript.outro.title, cx, vh * 0.25);
 
                         // Points
                         ctx.fillStyle = "#333";
                         let ptSize = vh * 0.031;
-                        ctx.font = `bold ${ptSize}px sans-serif`;
+                        ctx.font = `bold ${ptSize}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
 
                         ctx.textAlign = 'left';
                         const points = resolvedScript.outro.points || [];
@@ -883,10 +899,10 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         points.forEach((pt, i) => {
                             if (i < 3) {
                                 let cSize = ptSize;
-                                ctx.font = `bold ${cSize}px sans-serif`;
+                                ctx.font = `bold ${cSize}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                                 while (ctx.measureText(pt).width > cardW * 0.88 && cSize > 10) {
                                     cSize -= 1;
-                                    ctx.font = `bold ${cSize}px sans-serif`;
+                                    ctx.font = `bold ${cSize}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                                 }
                                 const tw = ctx.measureText(pt).width;
                                 ctx.fillText(pt, cx - tw/2, vh * yOffsets[i]);
@@ -896,7 +912,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         // Credit
                         ctx.textAlign = 'center';
                         ctx.fillStyle = "#475569";
-                        ctx.font = `bold ${vh * 0.028}px sans-serif`;
+                        ctx.font = `bold ${vh * 0.028}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         ctx.fillText(resolvedScript.outro.credit, cx, vh * 0.73);
 
                         // CTA Bar
@@ -909,7 +925,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             drawRoundedRect(ctx, ctaX, ctaY, ctaW, ctaH, ctaH/2);
 
                             ctx.fillStyle = "white";
-                            ctx.font = `bold ${vh * 0.027}px sans-serif`;
+                            ctx.font = `bold ${vh * 0.027}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                             ctx.fillText(resolvedScript.outro.cta, cx, ctaY + ctaH/2);
                         }
                     }
@@ -919,10 +935,10 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         const fullText = sub.text;
 
                         let subFontSize = Math.round(vh * 0.042);
-                        ctx.font = `bold ${subFontSize}px sans-serif`;
+                        ctx.font = `bold ${subFontSize}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         while (ctx.measureText(fullText).width > vw * 0.86 && subFontSize > 14) {
                             subFontSize -= 1;
-                            ctx.font = `bold ${subFontSize}px sans-serif`;
+                            ctx.font = `bold ${subFontSize}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
                         }
 
                         const textW = ctx.measureText(fullText).width;
@@ -931,11 +947,9 @@ const renderSubtitleText = (text: string, highlight: string) => {
                         const subX = (vw - subW) / 2;
                         const subY = vh * 0.88;
 
-                        ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-                        drawRoundedRect(ctx, subX, subY, subW, subH, vh * 0.03);
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
+                        ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+drawRoundedRect(ctx, subX, subY, subW, subH, vh * 0.03);
+ctx.fill();
 
                         ctx.fillStyle = '#ffffff';
                         const textX = subX + (subW - textW) / 2;
@@ -1147,7 +1161,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-start pt-12 sm:pt-20 px-6">
-                  <h1 className="text-white text-2xl sm:text-3xl font-black text-center leading-tight drop-shadow-lg scale-in-center tracking-wide">
+                  <h1 className="text-white text-2xl sm:text-3xl font-bold text-center leading-tight drop-shadow-lg scale-in-center tracking-wide">
                     {resolvedScript.cover?.title}
                   </h1>
                   {resolvedScript.cover?.subtitle && (
@@ -1199,7 +1213,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                           <div className="w-2.5 h-2.5 rounded-full bg-[#78C4EC]" />
                           <span className="text-[#78C4EC] font-bold text-xs tracking-wider">{evt.author || "Q&A"}</span>
                         </div>
-                        <h2 className="text-[#333] text-lg font-extrabold leading-tight">{evt.title || evt.question}</h2>
+                        <h2 className="text-[#0F172A] text-lg font-extrabold leading-tight">{evt.title || evt.question}</h2>
                       </div>
                     </div>
                   );
@@ -1208,7 +1222,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     <div key={evt.id} className={`absolute inset-0 z-20 flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm ${baseAnim}`}>
                       <div className="bg-white/95 rounded-2xl p-6 shadow-2xl max-w-xs text-center border-4 border-red-500 relative">
                         <div className="absolute -top-8 -left-8 text-6xl drop-shadow-md text-red-500 rotate-[-15deg]">🚫</div>
-                        <h2 className="text-[#333] text-xl font-black mt-2">{evt.title}</h2>
+                        <h2 className="text-[#0F172A] text-xl font-bold mt-2">{evt.title}</h2>
                       </div>
                     </div>
                   );
@@ -1223,17 +1237,17 @@ const renderSubtitleText = (text: string, highlight: string) => {
                   return (
                     <div key={evt.id} className={`absolute z-20 flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-full pr-4 pl-2 py-1.5 shadow-lg border border-gray-200 ${baseAnim}`} style={{ top: `${10 + idx * 10}%`, ...positionProps }}>
                       <span className="text-lg">{evt.icon}</span>
-                      <span className="text-[#333] font-bold text-sm">{evt.title}</span>
+                      <span className="text-[#0F172A] font-bold text-sm">{evt.title}</span>
                     </div>
                   );
                 case 'big_impact':
                   return (
                     <div key={evt.id} className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none mix-blend-overlay ${baseAnim}`}>
-                      <h2 className={`text-white text-5xl sm:text-7xl font-black uppercase tracking-wider drop-shadow-lg scale-in-center rotate-[-5deg] ${evt.strikeThrough ? 'line-through decoration-red-500 decoration-8' : ''}`}>
+                      <h2 className={`text-white text-5xl sm:text-7xl font-bold uppercase tracking-wider drop-shadow-lg scale-in-center rotate-[-5deg] ${evt.strikeThrough ? 'line-through decoration-red-500 decoration-8' : ''}`}>
                         {evt.title}
                       </h2>
                       {evt.badge && (
-                        <div className="absolute top-[30%] left-[20%] z-20 bg-red-600 text-white font-black px-4 py-2 text-xl rounded-md rotate-[-20deg] shadow-2xl border-2 border-white animate-bounce">
+                        <div className="absolute top-[30%] left-[20%] z-20 bg-red-600 text-white font-bold px-4 py-2 text-xl rounded-md rotate-[-20deg] shadow-2xl border-2 border-white animate-bounce">
                           {evt.badge}
                         </div>
                       )}
@@ -1244,7 +1258,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     <div key={evt.id} className={`absolute z-20 top-[40%] left-0 w-full flex items-center justify-center py-3 shadow-2xl border-y-4 border-black ${baseAnim}`} style={{ backgroundImage: 'repeating-linear-gradient(45deg, #facc15, #facc15 12px, #1e293b 12px, #1e293b 24px)' }}>
                       <div className="bg-black/80 px-6 py-1 rounded border border-yellow-400 flex items-center gap-2">
                         <span className="text-xl">⚠️</span>
-                        <span className="text-red-500 font-black text-xl tracking-widest">{evt.title}</span>
+                        <span className="text-red-500 font-bold text-xl tracking-widest">{evt.title}</span>
                       </div>
                     </div>
                   );
@@ -1263,12 +1277,12 @@ const renderSubtitleText = (text: string, highlight: string) => {
                   );
                 case 'progress_card':
                   return (
-                    <div key={evt.id} className={`absolute z-20 bottom-24 left-0 right-0 mx-auto max-w-xs w-[90%] bg-white/90 backdrop-blur rounded-xl p-4 shadow-xl ${baseAnim}`}>
+                    <div key={evt.id} className={`absolute z-20 bottom-24 left-0 right-0 mx-auto max-w-xs w-[90%] bg-white/98 backdrop-blur rounded-xl p-4 shadow-xl ${baseAnim}`}>
                        <div className="flex justify-between items-center mb-2">
                           <span className="text-[10px] font-bold text-white bg-[#78C4EC] px-2 py-0.5 rounded">{evt.badge || 'FEATURE'}</span>
                           <span className="text-lg">{evt.icon}</span>
                        </div>
-                       <h3 className="text-[#333] font-extrabold text-sm mb-2">{evt.title}</h3>
+                       <h3 className="text-[#0F172A] font-extrabold text-sm mb-2">{evt.title}</h3>
                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                           <div className="bg-[#78C4EC] h-2 rounded-full w-[80%] animate-[pulse_2s_ease-in-out_infinite]" />
                        </div>
@@ -1307,7 +1321,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                    <div className="inline-block px-3 py-1 mb-4 rounded-full text-xs font-bold bg-[#78C4EC]/10 text-[#78C4EC] border border-[#78C4EC]/20">
                      {resolvedScript.outro.badge}
                    </div>
-                   <h2 className="text-[#333] text-xl sm:text-2xl font-black mb-6 leading-tight">
+                   <h2 className="text-[#0F172A] text-xl sm:text-2xl font-bold mb-6 leading-tight">
                      {resolvedScript.outro.title}
                    </h2>
                    <ul className="space-y-4 mb-6">
@@ -1334,8 +1348,8 @@ const renderSubtitleText = (text: string, highlight: string) => {
             {activeEffects.subtitle && !activeEffects.cover && !activeEffects.outro && (
               <div className="absolute bottom-12 left-0 right-0 z-30 flex justify-center px-4">
                 <div className="bg-slate-900/80 backdrop-blur-md rounded-full px-5 py-2.5 sm:px-6 sm:py-3 shadow-lg border border-white/10 text-center max-w-xs sm:max-w-md animate-in slide-in-from-bottom-2 fade-in duration-200">
-                  <p className="text-white text-sm sm:text-base font-bold tracking-wide">
-                    {renderSubtitleText(activeEffects.subtitle.text, activeEffects.subtitle.highlight)}
+                  <p className="text-white text-sm sm:text-base font-semibold tracking-wide">
+                    {renderSubtitleText(activeEffects.subtitle.text, activeEffects.subtitle.highlight, activeEffects.subtitle.color)}
                   </p>
                 </div>
               </div>
@@ -1372,7 +1386,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                       }
                     }}
                     disabled={isExporting}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#333] hover:bg-gray-200"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#0F172A] hover:bg-gray-200"
                   >
                     {isPlaying ? '⏸ 暫停影片' : '▶ 播放影片'}
                   </button>
@@ -1389,7 +1403,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     disabled={isExporting}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
                       !isVideoMuted
-                        ? "bg-[#bbe3f8] text-[#333] shadow-sm hover:bg-[#a9d9f2]"
+                        ? "bg-[#bbe3f8] text-[#0F172A] shadow-sm hover:bg-[#a9d9f2]"
                         : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
                     }`}
                   >
@@ -1437,7 +1451,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v6.0)
+                      🎬 匯出有聲 MP4 影片 (v6.2)
                     </button>
                   )}
                 </div>

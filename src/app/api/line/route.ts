@@ -846,18 +846,19 @@ async function analyzeVideoWithAI(videoBuffer: Buffer | null, userHint: string) 
 2. 同時生成 \`speechSegments: [{ start: number, end: number, zoomLevel: 1 | 1.07 }]\` 陣列，標記真正有說話或精彩動作的連續區間，剔除換氣與空白停頓，並在相鄰片段交替設定 \`1\` 與 \`1.07\` 鏡頭縮放。
 
 【任務二：每 2～3 秒高密度視覺字卡事件流（events 陣列）】
-1. 除固定生成 cover（0.0s ~ 2.5s 日系雜誌風開場封面，含 issue, title, subtitle, stamp, speakerName, speakerTitle）外，請根據每一句字幕的語意，在全片時間軸上平均每 2～3.5 秒生成一個視覺字卡事件（控制在 12~16 個 events，避免 JSON 過長）！
-2. 每個 event 結構為：{ id: string, type: string, start: number, end: number, side?: 'left' | 'right' | 'center', title: string, subtitle?: string, items?: string[], number?: number, icon?: string, badge?: string, strikeThrough?: boolean, zoom?: boolean, sfx: 'pop' | 'whoosh' | 'ding' | 'alert' }。
+1. side 可以是 'left', 'right', 'center'。Never schedule two cards on the same side at overlapping timestamps! 除固定生成 cover（0.0s ~ 2.5s 日系雜誌風開場封面，含 issue, title, subtitle, stamp, speakerName, speakerTitle）外，請根據每一句字幕的語意，在全片時間軸上平均每 2～3.5 秒生成一個視覺字卡事件（控制在 12~16 個 events，避免 JSON 過長）！
+2. 每個 event 結構為：{ id: string, type: string, start: number, end: number, side?: 'left' | 'right' | 'center', title: string, subtitle?: string, items?: string[], number?: number, icon?: string, badge?: string, strikeThrough?: boolean, zoom?: boolean, sfx: 'none' }。
+請保持 card title 簡潔 (<= 12 中文字) 並且 subtitle <= 16 字元，以防文字重疊！
 3. 支援以下 9 種 EventType 模板：
-  - 'qa_bubble'：Q&A 提問對話氣泡框（如 author, title，搭配 sfx: 'pop'）
-  - 'myth_buster'：迷思破解／錯誤觀念禁止卡（搭配 sfx: 'alert'）
-  - 'numbered_pill'：連續編號膠囊（如 number: 1,2,3，搭配 sfx: 'pop'）
-  - 'icon_pill'：左上／右上毛玻璃圖示膠囊（如 icon, title，搭配 sfx: 'pop'）
-  - 'big_impact'：巨大立體視覺衝擊字（支援 strikeThrough, badge, 搭配 sfx: 'whoosh', zoom: true）
-  - 'warning_tape'：黃黑斜紋工程警戒條（講到注意事項時，搭配 sfx: 'alert', zoom: true）
-  - 'target_focus'：動態紅色／天藍色狙擊準心圈選（搭配 sfx: 'ding'）
-  - 'progress_card'：機能／療程進度條小卡（含 badge, title, icon，搭配 sfx: 'pop'）
-  - 'checklist_card'：總結勾選清單卡（含 title, items 逐項打勾，搭配 sfx: 'ding'）
+  - 'qa_bubble'：Q&A 提問對話氣泡框（如 author, title，搭配 sfx: 'none'）
+  - 'myth_buster'：迷思破解／錯誤觀念禁止卡（搭配 sfx: 'none'）
+  - 'numbered_pill'：連續編號膠囊（如 number: 1,2,3，搭配 sfx: 'none'）
+  - 'icon_pill'：左上／右上毛玻璃圖示膠囊（如 icon, title，搭配 sfx: 'none'）
+  - 'big_impact'：巨大立體視覺衝擊字（支援 strikeThrough, badge, 搭配 sfx: 'none', zoom: true）
+  - 'warning_tape'：黃黑斜紋工程警戒條（講到注意事項時，搭配 sfx: 'none', zoom: true）
+  - 'target_focus'：動態紅色／天藍色狙擊準心圈選（搭配 sfx: 'none'）
+  - 'progress_card'：機能／療程進度條小卡（含 badge, title, icon，搭配 sfx: 'none'）
+  - 'checklist_card'：總結勾選清單卡（含 title, items 逐項打勾，搭配 sfx: 'none'）
 
 JSON 輸出結構範例：
 {
