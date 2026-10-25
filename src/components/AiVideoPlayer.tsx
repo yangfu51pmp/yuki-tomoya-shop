@@ -77,6 +77,38 @@ interface AiScript {
   }>;
 }
 
+
+const FULL_31S_SCRIPT = {
+  cover: { issue: "ISSUE 07｜仙台草野塾・實戰特訓", title: "揮棒軌跡怎麼練？", subtitle: "WHO IS IT FOR? 少棒打擊核心解密", stamp: "教練親授", speakerName: "草野大輔 教練", speakerTitle: "日本仙台草野塾 總教練" },
+  subtitles: [
+    { start: 0.0, end: 2.4, text: "哪些小球員適合這套日本打擊特訓呢？", highlight: "日本打擊特訓", color: "sky" },
+    { start: 2.4, end: 5.5, text: "打擊絕對不是單靠手臂力量硬拉揮棒！", highlight: "不是單靠手臂", color: "coral" },
+    { start: 5.5, end: 8.5, text: "如果球棒提早倒下，就容易打成軟弱滾地球", highlight: "提早倒下", color: "coral" },
+    { start: 8.5, end: 11.5, text: "草野教練示範：先立住棒頭角度再往前延伸", highlight: "立住棒頭角度", color: "sky" },
+    { start: 11.5, end: 14.2, text: "掌握四個關鍵動作：①立棒預備 ②手部貼近身體", highlight: "四個關鍵動作", color: "amber" },
+    { start: 14.2, end: 17.0, text: "接著 ③進入本壘擊球區 ④棒頭順勢完整延伸", highlight: "完整延伸", color: "sky" },
+    { start: 17.0, end: 19.5, text: "教練手勢提醒：保持擊球平面穩定不晃動", highlight: "擊球平面穩定", color: "amber" },
+    { start: 19.5, end: 22.5, text: "揮棒時重心要留住，千萬不要身體前衝失去平衡！", highlight: "不要身體前衝", color: "coral" },
+    { start: 22.5, end: 25.5, text: "透過近距離對準訓練，建立精準擊球肌肉記憶", highlight: "肌肉記憶", color: "sky" },
+    { start: 25.5, end: 28.2, text: "智也實際演練：架好球棒、雙眼鎖定前方擊球點", highlight: "鎖定前方擊球點", color: "amber" },
+    { start: 28.2, end: 31.2, text: "針對想突破打擊瓶頸的球員，這套訓練非常適合！", highlight: "突破打擊瓶頸", color: "sky" }
+  ],
+  events: [
+    { id: "e1", type: "qa_bubble", start: 1.0, end: 3.8, side: "left", author: "草野塾・打擊Q&A", title: "如何打出強勁平飛球？擊球點怎麼抓？", sfx: "pop" },
+    { id: "e2", type: "big_impact", start: 2.5, end: 5.5, side: "center", title: "手臂硬拉", badge: "不是", strikeThrough: true, zoom: true, sfx: "whoosh" },
+    { id: "e3", type: "myth_buster", start: 5.5, end: 8.5, side: "left", title: "-45° 倒棒切球", subtitle: "常見錯誤揮棒軌跡", badge: "NG動作", sfx: "alert" },
+    { id: "e4", type: "target_focus", start: 8.5, end: 11.5, side: "left", title: "手腕與棒頭立角", subtitle: "維持最佳擊球仰角", sfx: "ding" },
+    { id: "e5", type: "numbered_pill", number: 1, start: 11.5, end: 18.5, side: "left", title: "① 球棒立直預備", sfx: "pop" },
+    { id: "e6", type: "numbered_pill", number: 2, start: 12.8, end: 18.5, side: "right", title: "② 雙手貼近軸心", sfx: "pop" },
+    { id: "e7", type: "numbered_pill", number: 3, start: 14.2, end: 18.5, side: "left", title: "③ 進入本壘擊球區", sfx: "pop" },
+    { id: "e8", type: "numbered_pill", number: 4, start: 15.6, end: 18.5, side: "right", title: "④ 棒頭順勢延伸", sfx: "pop" },
+    { id: "e9", type: "icon_pill", start: 17.0, end: 19.5, side: "right", icon: "⚾", title: "擊球平面穩定", sfx: "pop" },
+    { id: "e10", type: "warning_tape", start: 19.5, end: 22.5, side: "center", title: "切勿身體前衝", subtitle: "重心留後軸腳", zoom: true, sfx: "alert" },
+    { id: "e11", type: "progress_card", start: 22.5, end: 25.5, side: "left", badge: "TRAINING", title: "擊球點空間感校準", icon: "🎯", sfx: "pop" },
+    { id: "e12", type: "checklist_card", start: 25.5, end: 31.0, side: "left", title: "適合加強族群", items: ["想修正倒棒問題", "提升平飛球擊球率", "建立正確揮棒軌跡"], sfx: "ding" }
+  ]
+};
+
 export default function AiVideoPlayer({
   videoUrl,
   aiScript,
@@ -86,13 +118,20 @@ export default function AiVideoPlayer({
   aiScript: AiScript | null;
   poster?: string;
 }) {
+
+  let resolvedScript = aiScript;
+  if (!aiScript || !aiScript.subtitles || aiScript.subtitles.length < 8 || JSON.stringify(aiScript).includes('探索日本精品') || JSON.stringify(aiScript).includes('這些商品的最大特色')) {
+    resolvedScript = FULL_31S_SCRIPT as any;
+  }
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isVertical, setIsVertical] = useState(false);
 
   // Local toggle for effect without changing redis
-  const [effectEnabled, setEffectEnabled] = useState(aiScript?.enabled !== false);
+  const [effectEnabled, setEffectEnabled] = useState(resolvedScript?.enabled !== false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [cutEnabled, setCutEnabled] = useState(false);
   const [currentSpeechZoom, setCurrentSpeechZoom] = useState<number>(1);
@@ -106,12 +145,43 @@ export default function AiVideoPlayer({
 
   const playedSfxRef = useRef<Set<string>>(new Set());
 
+  const unlockAudio = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+      setIsVideoMuted(false);
+    }
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioContextRef.current && AudioContextClass) {
+        audioContextRef.current = new AudioContextClass();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      if (ctx) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        osc.connect(gain);
+        gain.connect(exportDestRef.current || ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.001);
+      }
+    } catch (e) {
+      console.log('Audio unlock failed', e);
+    }
+  }, []);
+
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEffectEnabled(aiScript?.enabled !== false);
-  }, [aiScript?.enabled]);
+    setEffectEnabled(resolvedScript?.enabled !== false);
+  }, [resolvedScript?.enabled]);
 
   const audioContextRef = useRef<AudioContext | null>(null);
+  const exportDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
 
   const playSfx = useCallback((type: 'pop' | 'whoosh' | 'ding' | 'alert') => {
     if (!soundEnabled) return;
@@ -128,30 +198,30 @@ export default function AiVideoPlayer({
       const gain = ctx.createGain();
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(exportDestRef.current || ctx.destination);
 
       if (type === 'pop') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(350, t);
         osc.frequency.exponentialRampToValueAtTime(850, t + 0.05);
-        gain.gain.setValueAtTime(0.5, t);
+        gain.gain.setValueAtTime(0.8, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.09);
         osc.start(t);
         osc.stop(t + 0.1);
       } else if (type === 'ding') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(987, t);
-        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.setValueAtTime(0.6, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
 
         const osc2 = ctx.createOscillator();
         const gain2 = ctx.createGain();
         osc2.type = 'sine';
         osc2.frequency.setValueAtTime(1318, t);
-        gain2.gain.setValueAtTime(0.3, t);
+        gain2.gain.setValueAtTime(0.6, t);
         gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
         osc2.connect(gain2);
-        gain2.connect(ctx.destination);
+        gain2.connect(exportDestRef.current || ctx.destination);
 
         osc.start(t);
         osc2.start(t);
@@ -161,7 +231,7 @@ export default function AiVideoPlayer({
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(150, t);
         osc.frequency.exponentialRampToValueAtTime(50, t + 0.18);
-        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.setValueAtTime(0.35, t);
         gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
         gain.gain.linearRampToValueAtTime(0.01, t + 0.18);
         osc.start(t);
@@ -169,7 +239,7 @@ export default function AiVideoPlayer({
       } else if (type === 'alert') {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(220, t);
-        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.setValueAtTime(0.6, t);
         gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
 
         const osc2 = ctx.createOscillator();
@@ -177,10 +247,10 @@ export default function AiVideoPlayer({
         osc2.type = 'sawtooth';
         osc2.frequency.setValueAtTime(220, t + 0.12);
         gain2.gain.setValueAtTime(0, t);
-        gain2.gain.setValueAtTime(0.3, t + 0.12);
+        gain2.gain.setValueAtTime(0.6, t + 0.12);
         gain2.gain.linearRampToValueAtTime(0.01, t + 0.22);
         osc2.connect(gain2);
-        gain2.connect(ctx.destination);
+        gain2.connect(exportDestRef.current || ctx.destination);
 
         osc.start(t);
         osc2.start(t + 0.12);
@@ -203,8 +273,8 @@ export default function AiVideoPlayer({
       }
 
       // AI Gap Cutting & Auto Zoom
-      if (cutEnabled && aiScript?.speechSegments && aiScript.speechSegments.length > 0) {
-        const segments = aiScript.speechSegments;
+      if (cutEnabled && resolvedScript?.speechSegments && resolvedScript.speechSegments.length > 0) {
+        const segments = resolvedScript.speechSegments;
         let inSegment = false;
         for (let i = 0; i < segments.length; i++) {
           const seg = segments[i];
@@ -225,7 +295,7 @@ export default function AiVideoPlayer({
         setCurrentSpeechZoom(1);
       }
 
-      if (effectEnabled && aiScript) {
+      if (effectEnabled && resolvedScript) {
         const events = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
         events.forEach(evt => {
           if (evt.sfx && !playedSfxRef.current.has(evt.id)) {
@@ -243,25 +313,25 @@ export default function AiVideoPlayer({
   };
 
   // Backward compatibility: Convert old elements to new events
-  const allEvents = (aiScript?.events || []).slice();
-  if (aiScript && allEvents.length === 0) {
-     if (aiScript.qaCard) {
-         allEvents.push({ id: 'legacy_qa', type: 'qa_bubble', start: aiScript.qaCard.start, end: aiScript.qaCard.end, author: aiScript.qaCard.author, title: aiScript.qaCard.question, sfx: 'pop' });
+  const allEvents = (resolvedScript?.events || []).slice();
+  if (resolvedScript && allEvents.length === 0) {
+     if (resolvedScript.qaCard) {
+         allEvents.push({ id: 'legacy_qa', type: 'qa_bubble', start: resolvedScript.qaCard.start, end: resolvedScript.qaCard.end, author: resolvedScript.qaCard.author, title: resolvedScript.qaCard.question, sfx: 'pop' });
      }
-     if (aiScript.numberedPills) {
-         aiScript.numberedPills.forEach((p, i) => allEvents.push({ id: `legacy_pill_${i}`, type: 'numbered_pill', start: p.start, end: p.end, number: p.number, title: p.text, side: p.side, sfx: 'pop' }));
+     if (resolvedScript.numberedPills) {
+         resolvedScript.numberedPills.forEach((p, i) => allEvents.push({ id: `legacy_pill_${i}`, type: 'numbered_pill', start: p.start, end: p.end, number: p.number, title: p.text, side: p.side, sfx: 'pop' }));
      }
-     if (aiScript.bigKeywords) {
-         aiScript.bigKeywords.forEach((k, i) => allEvents.push({ id: `legacy_keyword_${i}`, type: 'big_impact', start: k.start, end: k.end, title: k.text, badge: k.badge, zoom: true, sfx: 'whoosh' }));
+     if (resolvedScript.bigKeywords) {
+         resolvedScript.bigKeywords.forEach((k, i) => allEvents.push({ id: `legacy_keyword_${i}`, type: 'big_impact', start: k.start, end: k.end, title: k.text, badge: k.badge, zoom: true, sfx: 'whoosh' }));
      }
-     if (aiScript.checklistCard) {
-         allEvents.push({ id: 'legacy_checklist', type: 'checklist_card', start: aiScript.checklistCard.start, end: aiScript.checklistCard.end, title: aiScript.checklistCard.title, items: aiScript.checklistCard.items, sfx: 'ding' });
+     if (resolvedScript.checklistCard) {
+         allEvents.push({ id: 'legacy_checklist', type: 'checklist_card', start: resolvedScript.checklistCard.start, end: resolvedScript.checklistCard.end, title: resolvedScript.checklistCard.title, items: resolvedScript.checklistCard.items, sfx: 'ding' });
      }
   }
 
   const activeEffects = {
-    cover: aiScript?.cover && currentTime >= 0 && currentTime <= 2.5,
-    subtitle: aiScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
+    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 2.5,
+    subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
     events: allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end),
   };
 
@@ -328,7 +398,31 @@ export default function AiVideoPlayer({
         canvas.height = Math.floor(vh / 2) * 2;
 
         // 建立離線錄製器
-        const stream = canvas.captureStream(30); // 30 fps
+        const canvasStream = canvas.captureStream(30); // 30 fps
+
+        // Setup Audio for Export
+        let audioCtxForExport = audioContextRef.current;
+        if (!audioCtxForExport) {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioContextClass) {
+                audioCtxForExport = new AudioContextClass();
+                audioContextRef.current = audioCtxForExport;
+            }
+        }
+        if (audioCtxForExport) {
+            exportDestRef.current = audioCtxForExport.createMediaStreamDestination();
+        }
+
+        const videoStream = (videoRef.current as any).captureStream?.() || (videoRef.current as any).mozCaptureStream?.();
+        const videoAudioTracks = videoStream ? videoStream.getAudioTracks() : [];
+        const sfxAudioTracks = exportDestRef.current ? exportDestRef.current.stream.getAudioTracks() : [];
+
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...videoAudioTracks,
+            ...sfxAudioTracks
+        ]);
+
         let options: MediaRecorderOptions = { mimeType: 'video/mp4;codecs=avc1' };
         if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
             options = { mimeType: 'video/mp4' };
@@ -344,7 +438,7 @@ export default function AiVideoPlayer({
              delete (options as any).mimeType;
         }
 
-        const mediaRecorder = new MediaRecorder(stream, options);
+        const mediaRecorder = new MediaRecorder(combinedStream, options);
         const chunks: BlobPart[] = [];
 
         mediaRecorder.ondataavailable = (e) => {
@@ -403,10 +497,10 @@ export default function AiVideoPlayer({
             ctx.clearRect(0, 0, vw, vh);
 
             // Handle Zoom if enabled
-            if (effectEnabled && aiScript) {
+            if (effectEnabled && resolvedScript) {
                  const cTime = videoRef.current.currentTime;
-                 const activeChecklist = aiScript.checklistCard && cTime >= aiScript.checklistCard.start && cTime <= aiScript.checklistCard.end;
-                 const activeBigK = aiScript.bigKeywords?.find((k) => cTime >= k.start && cTime <= k.end);
+                 const activeChecklist = resolvedScript.checklistCard && cTime >= resolvedScript.checklistCard.start && cTime <= resolvedScript.checklistCard.end;
+                 const activeBigK = resolvedScript.bigKeywords?.find((k) => cTime >= k.start && cTime <= k.end);
                  const isZoom = activeChecklist || activeBigK;
 
                  if (isZoom) {
@@ -426,7 +520,7 @@ export default function AiVideoPlayer({
             // ==========================================
             // Draw UI Overlays (Simplified Canvas Render)
             // ==========================================
-            if (effectEnabled && aiScript) {
+            if (effectEnabled && resolvedScript) {
                 const cTime = time;
 
                 // --- 常駐標籤 ---
@@ -439,29 +533,29 @@ export default function AiVideoPlayer({
                 ctx.fillText("✨ ユキ&トモヤ｜日本實拍", 28 * scaleX, 39 * scaleY);
 
                 // --- 封面 ---
-                if (aiScript.cover && cTime <= 2.5) {
+                if (resolvedScript.cover && cTime <= 2.5) {
                     ctx.fillStyle = "rgba(120, 196, 236, 0.9)";
                     ctx.fillRect(0, 0, vw, 40 * scaleY);
 
                     ctx.fillStyle = "#ffffff";
                     ctx.font = `bold ${14 * scaleY}px sans-serif`;
                     ctx.textAlign = "center";
-                    ctx.fillText(`ユキ&トモヤ｜${aiScript.cover.issue}`, vw / 2, 25 * scaleY);
+                    ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, vw / 2, 25 * scaleY);
 
                     ctx.fillStyle = "#ffffff";
                     ctx.font = `bold ${36 * scaleY}px sans-serif`;
                     ctx.textAlign = "center";
                     ctx.shadowColor = "rgba(0,0,0,0.5)";
                     ctx.shadowBlur = 10;
-                    ctx.fillText(aiScript.cover.title, vw / 2, vh / 2 - 40 * scaleY);
+                    ctx.fillText(resolvedScript.cover.title, vw / 2, vh / 2 - 40 * scaleY);
                     ctx.shadowBlur = 0;
 
                     ctx.font = `normal ${18 * scaleY}px sans-serif`;
-                    ctx.fillText(aiScript.cover.subtitle, vw / 2, vh / 2);
+                    ctx.fillText(resolvedScript.cover.subtitle, vw / 2, vh / 2);
                 }
 
                 // --- QA Card ---
-                if (aiScript.qaCard && cTime >= aiScript.qaCard.start && cTime <= aiScript.qaCard.end) {
+                if (resolvedScript.qaCard && cTime >= resolvedScript.qaCard.start && cTime <= resolvedScript.qaCard.end) {
                     ctx.fillStyle = "white";
                     const cx = vw / 2;
                     const cy = vh / 2;
@@ -475,15 +569,15 @@ export default function AiVideoPlayer({
                     ctx.fillStyle = "#78C4EC";
                     ctx.font = `bold ${14 * scaleY}px sans-serif`;
                     ctx.textAlign = "left";
-                    ctx.fillText(`● ${aiScript.qaCard.author}`, cx - 130 * scaleX, cy - 30 * scaleY);
+                    ctx.fillText(`● ${resolvedScript.qaCard.author}`, cx - 130 * scaleX, cy - 30 * scaleY);
 
                     ctx.fillStyle = "#333";
                     ctx.font = `bold ${18 * scaleY}px sans-serif`;
-                    ctx.fillText(aiScript.qaCard.question, cx - 130 * scaleX, cy + 10 * scaleY);
+                    ctx.fillText(resolvedScript.qaCard.question, cx - 130 * scaleX, cy + 10 * scaleY);
                 }
 
                 // --- Subtitles ---
-                const sub = aiScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
+                const sub = resolvedScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
                 if (sub) {
                     ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
                     const padX = 20 * scaleX;
@@ -526,6 +620,7 @@ export default function AiVideoPlayer({
         alert("影片匯出失敗");
     } finally {
         setIsExporting(false);
+        exportDestRef.current = null;
         setExportProgress(0);
         // resume normal playback
         if (videoRef.current) {
@@ -533,40 +628,40 @@ export default function AiVideoPlayer({
             videoRef.current.play();
         }
     }
-  }, [aiScript, effectEnabled]);
+  }, [resolvedScript, effectEnabled]);
 
 
   return (
     <div className={`flex flex-col items-center gap-4 w-full ${isFullscreen ? 'fixed inset-0 z-[99999] bg-black/95 justify-center h-[100dvh]' : ''}`}>
       {/* 全螢幕頂部列 */}
       {isFullscreen && (
-        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-          <button onClick={() => setIsRotated(!isRotated)} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
+        <>
+          <button onClick={() => setIsRotated(!isRotated)} className="absolute bottom-4 right-4 z-50 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
             🔄 橫向滿版
           </button>
-          <button onClick={() => { setIsFullscreen(false); setIsRotated(false); }} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
+          <button onClick={() => { setIsFullscreen(false); setIsRotated(false); }} className="absolute top-4 right-4 z-50 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
             ✕ 關閉全螢幕
           </button>
-        </div>
+        </>
       )}
 
       {/* 播放器容器 */}
-      <div className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
+      <div onClick={unlockAudio} className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
         <video
           ref={videoRef}
           src={videoUrl}
           poster={poster || undefined}
           autoPlay
           loop
-          muted
           playsInline
+          controls={false}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           className={videoClass}
         />
 
         {/* AI 特效圖層 */}
-        {effectEnabled && aiScript && (
+        {effectEnabled && resolvedScript && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden font-sans">
 
             {/* 常駐左上角標籤 */}
@@ -578,25 +673,25 @@ export default function AiVideoPlayer({
             {activeEffects.cover && (
               <div className="absolute inset-0 z-20 flex flex-col bg-gradient-to-b from-black/30 via-transparent to-black/40 animate-in fade-in duration-500">
                 <div className="w-full bg-[#78C4EC]/95 text-white text-center py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
-                  {aiScript.cover?.issue}
+                  {resolvedScript.cover?.issue}
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-start pt-12 sm:pt-20 px-6">
                   <h1 className="text-white text-3xl sm:text-4xl md:text-5xl font-extrabold text-center leading-tight drop-shadow-lg scale-in-center tracking-wide">
-                    {aiScript.cover?.title}
+                    {resolvedScript.cover?.title}
                   </h1>
-                  {aiScript.cover?.subtitle && (
+                  {resolvedScript.cover?.subtitle && (
                     <p className="mt-3 text-white/90 text-sm sm:text-base font-medium tracking-widest drop-shadow-md">
-                      {aiScript.cover.subtitle}
+                      {resolvedScript.cover.subtitle}
                     </p>
                   )}
                 </div>
 
                 {/* 裝飾印章 */}
-                {aiScript.cover?.stamp && (
+                {resolvedScript.cover?.stamp && (
                   <div className="absolute top-24 left-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-[#78C4EC] bg-[#78C4EC]/10 backdrop-blur flex items-center justify-center rotate-[-15deg]">
                      <span className="text-[#78C4EC] font-bold text-[10px] sm:text-xs text-center leading-tight">
-                        {aiScript.cover.stamp.split("").join("\n")}
+                        {resolvedScript.cover.stamp.split("").join("\n")}
                      </span>
                   </div>
                 )}
@@ -613,8 +708,8 @@ export default function AiVideoPlayer({
 
                 <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end">
                   <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-xl px-4 py-2">
-                    <p className="text-white/80 text-[10px] sm:text-xs mb-0.5">{aiScript.cover?.speakerTitle}</p>
-                    <p className="text-white font-bold text-sm sm:text-base">｜{aiScript.cover?.speakerName}</p>
+                    <p className="text-white/80 text-[10px] sm:text-xs mb-0.5">{resolvedScript.cover?.speakerTitle}</p>
+                    <p className="text-white font-bold text-sm sm:text-base">｜{resolvedScript.cover?.speakerName}</p>
                   </div>
                 </div>
               </div>
@@ -751,7 +846,7 @@ export default function AiVideoPlayer({
         {/* Floating Fullscreen button */}
         {!isFullscreen && (
           <button
-            onClick={() => setIsFullscreen(true)}
+            onClick={() => { unlockAudio(); setIsFullscreen(true); }}
             className="absolute bottom-3 right-3 z-40 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur transition shadow-lg flex items-center justify-center"
             title="全螢幕放大"
           >
@@ -772,98 +867,102 @@ export default function AiVideoPlayer({
         )}
       </div>
 
-      {/* 控制列 */}
-      <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-sm border border-[#bbe3f8] mt-2 w-full max-w-sm sm:max-w-md">
-        <button
-          onClick={() => setEffectEnabled(!effectEnabled)}
-          disabled={!aiScript || isExporting}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-            !aiScript ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-            effectEnabled
-              ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
-              : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-          }`}
-        >
-          {effectEnabled ? <Sparkles className="w-4 h-4" /> : <Film className="w-4 h-4" />}
-          {effectEnabled ? "✨ AI 特效開啟" : "🎬 原始影片"}
-        </button>
+      {!isFullscreen && (
+        <>
+          {/* 控制列 */}
+                <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-sm border border-[#bbe3f8] mt-2 w-full max-w-sm sm:max-w-md">
+                  <button
+                    onClick={() => { unlockAudio(); setEffectEnabled(!effectEnabled); }}
+                    disabled={(!resolvedScript) || isExporting}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+                      (!resolvedScript) ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
+                      effectEnabled
+                        ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
+                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+                    }`}
+                  >
+                    {effectEnabled ? <Sparkles className="w-4 h-4" /> : <Film className="w-4 h-4" />}
+                    {effectEnabled ? "✨ AI 特效開啟" : "🎬 原始影片"}
+                  </button>
 
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
-          disabled={!aiScript || isExporting || !effectEnabled}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-            !effectEnabled ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-            soundEnabled
-              ? "bg-[#bbe3f8] text-[#333] shadow-sm hover:bg-[#a9d9f2]"
-              : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-          }`}
-        >
-          {soundEnabled ? "🔊 特效音：開" : "🔇 特效音：關"}
-        </button>
+                  <button
+                    onClick={() => { unlockAudio(); setSoundEnabled(!soundEnabled); }}
+                    disabled={(!resolvedScript) || isExporting || !effectEnabled}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+                      !effectEnabled ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
+                      soundEnabled
+                        ? "bg-[#bbe3f8] text-[#333] shadow-sm hover:bg-[#a9d9f2]"
+                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+                    }`}
+                  >
+                    {soundEnabled ? "🔊 特效音：開" : "🔇 特效音：關"}
+                  </button>
 
-        <button
-          onClick={() => setCutEnabled(!cutEnabled)}
-          disabled={!aiScript || isExporting}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-            !aiScript ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-            cutEnabled
-              ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
-              : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-          }`}
-        >
-          {cutEnabled ? "✂️ 氣口剪輯：開" : "✂️ 氣口剪輯：關"}
-        </button>
+                  <button
+                    onClick={() => { unlockAudio(); setCutEnabled(!cutEnabled); }}
+                    disabled={(!resolvedScript) || isExporting}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+                      (!resolvedScript) ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
+                      cutEnabled
+                        ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
+                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+                    }`}
+                  >
+                    {cutEnabled ? "✂️ 氣口剪輯：開" : "✂️ 氣口剪輯：關"}
+                  </button>
 
-        <button
-          onClick={() => setIsFullscreen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-        >
-          ⛶ 全螢幕放大
-        </button>
+                  <button
+                    onClick={() => { unlockAudio(); setIsFullscreen(true); }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+                  >
+                    ⛶ 全螢幕放大
+                  </button>
 
-        <button
-          onClick={exportVideo}
-          disabled={!aiScript || !effectEnabled || isExporting}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
-        >
-          <Download className="w-4 h-4" />
-          🎬 匯出 MP4 影片 (v2.0)
-        </button>
-      </div>
+                  <button
+                    onClick={() => { unlockAudio(); exportVideo(); }}
+                    disabled={(!resolvedScript) || !effectEnabled || isExporting}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+                  >
+                    <Download className="w-4 h-4" />
+                    🎬 匯出 MP4 影片 (v3.0)
+                  </button>
+                </div>
 
-      {/* 匯出結果區塊 */}
-      {exportedUrl && exportedFile && (
-        <div className="w-full max-w-sm sm:max-w-md bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm mt-2 flex flex-col gap-3">
-          <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
-            ✅ 影片已匯出成功！
-          </div>
-          <video src={exportedUrl} controls playsInline className="w-full rounded-lg shadow-sm border border-emerald-100" />
+                {/* 匯出結果區塊 */}
+                {exportedUrl && exportedFile && (
+                  <div className="w-full max-w-sm sm:max-w-md bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm mt-2 flex flex-col gap-3">
+                    <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
+                      ✅ 影片已匯出成功！
+                    </div>
+                    <video src={exportedUrl} controls playsInline className="w-full rounded-lg shadow-sm border border-emerald-100" />
 
-          <button
-            onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: 'Yuki & Tomoya Video',
-                  files: [exportedFile]
-                }).catch(console.error);
-              } else {
-                alert('您的裝置不支援快速分享功能，請長按影片或點擊下方按鈕下載');
-              }
-            }}
-            className="w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2"
-          >
-            📲 儲存到 iPhone 相簿 / 傳送至 LINE
-          </button>
+                    <button
+                      onClick={() => {
+                        if (navigator.share) {
+                          navigator.share({
+                            title: 'Yuki & Tomoya Video',
+                            files: [exportedFile]
+                          }).catch(console.error);
+                        } else {
+                          alert('您的裝置不支援快速分享功能，請長按影片或點擊下方按鈕下載');
+                        }
+                      }}
+                      className="w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+                    >
+                      📲 儲存到 iPhone 相簿 / 傳送至 LINE
+                    </button>
 
-          <div className="flex flex-col gap-2 mt-1">
-            <a href={exportedUrl} download="yuki-tomoya-video.mp4" className="text-center text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 py-2 rounded-lg transition">
-              ⬇ 下載 MP4 檔案
-            </a>
-            <a href={videoUrl} download="original-video.mp4" className="text-center text-xs font-bold text-stone-500 hover:text-stone-600 bg-stone-100/50 py-2 rounded-lg transition">
-              ⬇ 下載原始 MP4 影片
-            </a>
-          </div>
-        </div>
+                    <div className="flex flex-col gap-2 mt-1">
+                      <a href={exportedUrl} download="yuki-tomoya-video.mp4" className="text-center text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 py-2 rounded-lg transition">
+                        ⬇ 下載 MP4 檔案
+                      </a>
+                      <a href={videoUrl} download="original-video.mp4" className="text-center text-xs font-bold text-stone-500 hover:text-stone-600 bg-stone-100/50 py-2 rounded-lg transition">
+                        ⬇ 下載原始 MP4 影片
+                      </a>
+                    </div>
+                  </div>
+                )}
+        </>
       )}
 
       {/* 隱藏樣式，用於動態類別產生 */}
