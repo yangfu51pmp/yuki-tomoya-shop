@@ -75,37 +75,56 @@ interface AiScript {
     author?: string; // For qa_bubble backward compat
     question?: string; // For qa_bubble backward compat
   }>;
+  outro?: {
+    badge: string;
+    title: string;
+    points: string[];
+    credit: string;
+    cta: string;
+  };
 }
 
 
-const FULL_31S_SCRIPT = {
-  cover: { issue: "ISSUE 07｜仙台草野塾・實戰特訓", title: "揮棒軌跡怎麼練？", subtitle: "WHO IS IT FOR? 少棒打擊核心解密", stamp: "教練親授", speakerName: "草野大輔 教練", speakerTitle: "日本仙台草野塾 總教練" },
+const FULL_71S_SCRIPT = {
+  cover: { issue: "ISSUE 07｜日本仙台・草野塾實戰特訓", title: "揮棒軌跡怎麼練？", subtitle: "前日職樂天金鷲・草野大輔教練 親授打擊核心", stamp: "名師親授", speakerName: "草野大輔 教練", speakerTitle: "日本仙台草野塾 總教練" },
+  outro: { badge: "⚾ 仙台草野塾 × ユキ&トモヤ｜特訓總結", title: "少棒打擊 3 大核心重點", points: ["1️⃣ 立棒預備：消除倒棒習慣，最短距離切入球心", "2️⃣ 軸心穩定：重心留住不前衝，手肘貼近身體導引", "3️⃣ 完整延伸：正面咬中擊球點，手腕順勢延伸釋放力量"], credit: "指導：草野大輔 教練｜選手：智也 (Tomoya)", cta: "💬 ユキ&トモヤ 日本連線代購 & 台日少棒交流｜歡迎 LINE 諮詢" },
   subtitles: [
-    { start: 0.0, end: 2.4, text: "哪些小球員適合這套日本打擊特訓呢？", highlight: "日本打擊特訓", color: "sky" },
-    { start: 2.4, end: 5.5, text: "打擊絕對不是單靠手臂力量硬拉揮棒！", highlight: "不是單靠手臂", color: "coral" },
-    { start: 5.5, end: 8.5, text: "如果球棒提早倒下，就容易打成軟弱滾地球", highlight: "提早倒下", color: "coral" },
-    { start: 8.5, end: 11.5, text: "草野教練示範：先立住棒頭角度再往前延伸", highlight: "立住棒頭角度", color: "sky" },
-    { start: 11.5, end: 14.2, text: "掌握四個關鍵動作：①立棒預備 ②手部貼近身體", highlight: "四個關鍵動作", color: "amber" },
-    { start: 14.2, end: 17.0, text: "接著 ③進入本壘擊球區 ④棒頭順勢完整延伸", highlight: "完整延伸", color: "sky" },
-    { start: 17.0, end: 19.5, text: "教練手勢提醒：保持擊球平面穩定不晃動", highlight: "擊球平面穩定", color: "amber" },
-    { start: 19.5, end: 22.5, text: "揮棒時重心要留住，千萬不要身體前衝失去平衡！", highlight: "不要身體前衝", color: "coral" },
-    { start: 22.5, end: 25.5, text: "透過近距離對準訓練，建立精準擊球肌肉記憶", highlight: "肌肉記憶", color: "sky" },
-    { start: 25.5, end: 28.2, text: "智也實際演練：架好球棒、雙眼鎖定前方擊球點", highlight: "鎖定前方擊球點", color: "amber" },
-    { start: 28.2, end: 31.2, text: "針對想突破打擊瓶頸的球員，這套訓練非常適合！", highlight: "突破打擊瓶頸", color: "sky" }
+    { start: 0.0, end: 3.5, text: "【仙台草野塾】今天由草野教練親授正確的揮棒軌跡！", highlight: "正確的揮棒軌跡", color: "sky" },
+    { start: 3.5, end: 7.0, text: "草野教練：「很多球員準備揮棒時，球棒會這樣往後倒平…」", highlight: "往後倒平", color: "coral" },
+    { start: 7.0, end: 10.5, text: "草野教練：「這樣不對！球棒要先立起來，手部留在軸心內側」", highlight: "球棒要先立起來", color: "sky" },
+    { start: 10.5, end: 14.0, text: "草野教練：「出棒不要用雙手硬拉，手肘順著身體前導推出」", highlight: "手肘順著身體", color: "amber" },
+    { start: 14.0, end: 17.5, text: "草野教練：「看這個角度！從耳際最短距離直接切入擊球區」", highlight: "最短距離", color: "sky" },
+    { start: 17.5, end: 21.0, text: "草野教練：「球棒通過本壘上方時，擊球平面要穩定不晃動」", highlight: "擊球平面要穩定", color: "amber" },
+    { start: 21.0, end: 25.0, text: "草野教練：「眼睛盯住前面這顆白球，預判球進本壘的高度」", highlight: "盯住前面這顆白球", color: "sky" },
+    { start: 25.0, end: 28.8, text: "草野教練：「慢動作分解：①立棒預備 ➔ ②雙手貼近身體導引」", highlight: "①立棒預備", color: "amber" },
+    { start: 28.8, end: 32.8, text: "草野教練：「接著 ③在擊球點正面咬中球心，棒頭絕不能掉下來」", highlight: "正面咬中球心", color: "coral" },
+    { start: 32.8, end: 36.8, text: "草野教練：「再看一次軌跡：順著延伸線，平平地穿過球心！」", highlight: "平平地穿過球心", color: "sky" },
+    { start: 36.8, end: 41.2, text: "草野教練：「擊中球後手腕自然帶過，把全身旋轉力量釋放出來」", highlight: "力量釋放出來", color: "amber" },
+    { start: 41.2, end: 45.2, text: "草野教練：「注意喔！上半身千萬別急著往前衝，重心要留住」", highlight: "重心要留住", color: "coral" },
+    { start: 45.2, end: 49.0, text: "草野教練：「用下半身帶動腰部旋轉，雙手自然把球棒順暢帶出」", highlight: "下半身帶動腰部", color: "sky" },
+    { start: 49.0, end: 53.0, text: "草野教練：「好，換智也實作看看！先把球棒架好對準前方」", highlight: "換智也實作看看", color: "amber" },
+    { start: 53.0, end: 57.2, text: "草野教練：「對！雙手放在耳朵旁邊這個高度，雙肩保持放鬆」", highlight: "耳朵旁邊這個高度", color: "sky" },
+    { start: 57.2, end: 61.0, text: "草野教練：「很好！下盤站穩保持平衡，眼神鎖定前方擊球點」", highlight: "眼神鎖定前方", color: "amber" },
+    { start: 61.0, end: 64.5, text: "草野教練：「先在腦中確認一次剛才的揮棒軌道，動作流暢就好」", highlight: "確認一次", color: "sky" },
+    { start: 64.5, end: 67.5, text: "草野教練：「漂亮！就是這個出棒角度，棒頭維持得非常好！」", highlight: "就是這個出棒角度", color: "amber" },
+    { start: 67.5, end: 72.0, text: "【今日特訓總結】記住這個擊球手感！仙台草野塾 × ユキ&トモヤ", highlight: "仙台草野塾", color: "sky" }
   ],
   events: [
-    { id: "e1", type: "qa_bubble", start: 1.0, end: 3.8, side: "left", author: "草野塾・打擊Q&A", title: "如何打出強勁平飛球？擊球點怎麼抓？", sfx: "pop" },
-    { id: "e2", type: "big_impact", start: 2.5, end: 5.5, side: "center", title: "手臂硬拉", badge: "不是", strikeThrough: true, zoom: true, sfx: "whoosh" },
-    { id: "e3", type: "myth_buster", start: 5.5, end: 8.5, side: "left", title: "-45° 倒棒切球", subtitle: "常見錯誤揮棒軌跡", badge: "NG動作", sfx: "alert" },
-    { id: "e4", type: "target_focus", start: 8.5, end: 11.5, side: "left", title: "手腕與棒頭立角", subtitle: "維持最佳擊球仰角", sfx: "ding" },
-    { id: "e5", type: "numbered_pill", number: 1, start: 11.5, end: 18.5, side: "left", title: "① 球棒立直預備", sfx: "pop" },
-    { id: "e6", type: "numbered_pill", number: 2, start: 12.8, end: 18.5, side: "right", title: "② 雙手貼近軸心", sfx: "pop" },
-    { id: "e7", type: "numbered_pill", number: 3, start: 14.2, end: 18.5, side: "left", title: "③ 進入本壘擊球區", sfx: "pop" },
-    { id: "e8", type: "numbered_pill", number: 4, start: 15.6, end: 18.5, side: "right", title: "④ 棒頭順勢延伸", sfx: "pop" },
-    { id: "e9", type: "icon_pill", start: 17.0, end: 19.5, side: "right", icon: "⚾", title: "擊球平面穩定", sfx: "pop" },
-    { id: "e10", type: "warning_tape", start: 19.5, end: 22.5, side: "center", title: "切勿身體前衝", subtitle: "重心留後軸腳", zoom: true, sfx: "alert" },
-    { id: "e11", type: "progress_card", start: 22.5, end: 25.5, side: "left", badge: "TRAINING", title: "擊球點空間感校準", icon: "🎯", sfx: "pop" },
-    { id: "e12", type: "checklist_card", start: 25.5, end: 31.0, side: "left", title: "適合加強族群", items: ["想修正倒棒問題", "提升平飛球擊球率", "建立正確揮棒軌跡"], sfx: "ding" }
+    { id: "e1", type: "qa_bubble", start: 3.5, end: 7.0, side: "left", author: "草野塾・打擊Q&A", title: "為什麼揮棒容易切球或打成滾地球？", sfx: "pop" },
+    { id: "e2", type: "myth_buster", start: 5.0, end: 9.0, side: "right", title: "NG：球棒往後倒平", subtitle: "導致出棒繞遠路、棒頭下掉", badge: "錯誤姿勢", sfx: "alert" },
+    { id: "e3", type: "big_impact", start: 9.0, end: 13.5, side: "center", title: "手臂硬拉", badge: "不是", strikeThrough: true, zoom: true, sfx: "whoosh" },
+    { id: "e4", type: "target_focus", start: 13.5, end: 17.5, side: "left", title: "手腕立棒角度", subtitle: "最短距離切入本壘擊球區", sfx: "ding" },
+    { id: "e5", type: "icon_pill", start: 17.5, end: 21.0, side: "right", icon: "⚾", title: "擊球平面穩定不晃動", sfx: "pop" },
+    { id: "e6", type: "target_focus", start: 21.0, end: 25.0, side: "left", title: "視線鎖定：定點白球", subtitle: "預判進壘高度與擊球空間", sfx: "ding" },
+    { id: "e7", type: "numbered_pill", number: 1, start: 25.0, end: 36.8, side: "left", title: "立棒預備（不倒棒）", sfx: "pop" },
+    { id: "e8", type: "numbered_pill", number: 2, start: 27.5, end: 36.8, side: "right", title: "手肘貼近軸心導引", sfx: "pop" },
+    { id: "e9", type: "numbered_pill", number: 3, start: 30.0, end: 36.8, side: "left", title: "擊球點正面咬中球心", sfx: "pop" },
+    { id: "e10", type: "numbered_pill", number: 4, start: 33.0, end: 36.8, side: "right", title: "順著延伸線平穿而出", sfx: "pop" },
+    { id: "e11", type: "progress_card", start: 36.8, end: 41.2, side: "left", badge: "POWER", title: "手腕跟進與力量釋放", icon: "⚡", sfx: "pop" },
+    { id: "e12", type: "warning_tape", start: 41.2, end: 47.0, side: "center", title: "切勿身體前衝", subtitle: "重心留後軸腳・下半身帶動旋轉", zoom: true, sfx: "alert" },
+    { id: "e13", type: "qa_bubble", start: 49.0, end: 54.0, side: "left", author: "實戰演練・智也登場", title: "架高球棒、雙手置於耳際高度預備", sfx: "pop" },
+    { id: "e14", type: "checklist_card", start: 54.0, end: 64.5, side: "left", title: "揮棒前 Check List", items: ["雙手置於耳際高度放鬆", "下盤站穩重心留軸心腳", "雙眼鎖定前方擊球點"], sfx: "ding" },
+    { id: "e15", type: "big_impact", start: 64.5, end: 67.2, side: "center", title: "完美軌跡", badge: "GOOD!", strikeThrough: false, zoom: true, sfx: "ding" }
   ]
 };
 
@@ -113,15 +132,19 @@ export default function AiVideoPlayer({
   videoUrl,
   aiScript,
   poster,
+  isPreviewProp,
 }: {
   videoUrl: string;
   aiScript: AiScript | null;
   poster?: string;
+  isPreviewProp?: boolean;
 }) {
 
+  const isPreviewMode = Boolean(isPreviewProp || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'video'));
+
   let resolvedScript = aiScript;
-  if (!aiScript || !aiScript.subtitles || aiScript.subtitles.length < 8 || JSON.stringify(aiScript).includes('探索日本精品') || JSON.stringify(aiScript).includes('這些商品的最大特色')) {
-    resolvedScript = FULL_31S_SCRIPT as any;
+  if (!aiScript || !aiScript.subtitles || aiScript.subtitles.length < 15 || !aiScript.outro) {
+    resolvedScript = FULL_71S_SCRIPT as any;
   }
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -339,9 +362,10 @@ export default function AiVideoPlayer({
   }
 
   const activeEffects = {
-    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 2.4,
+    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 3.5,
     subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
     events: allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end),
+    outro: resolvedScript?.outro && videoRef.current?.duration && videoRef.current.duration > 10 && currentTime >= videoRef.current.duration - 3.8,
   };
 
   const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
@@ -421,6 +445,26 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
         const canvasStream = canvas.captureStream(30);
 
+        // -- Audio Decoding --
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const actx = new AudioContextClass();
+        const audioDest = actx.createMediaStreamDestination();
+        exportDestRef.current = audioDest;
+
+        const res = await fetch(videoUrl);
+        const arrayBuffer = await res.arrayBuffer();
+        const audioBuffer = await actx.decodeAudioData(arrayBuffer);
+
+        const sourceNode = actx.createBufferSource();
+        sourceNode.buffer = audioBuffer;
+        sourceNode.connect(audioDest);
+        // sourceNode will be started right before v.play()
+
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioDest.stream.getAudioTracks()
+        ]);
+
         let options: MediaRecorderOptions = { mimeType: 'video/mp4;codecs=avc1' };
         if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
             options = { mimeType: 'video/mp4' };
@@ -432,7 +476,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
              delete (options as any).mimeType;
         }
 
-        const mediaRecorder = new MediaRecorder(canvasStream, options);
+        const mediaRecorder = new MediaRecorder(combinedStream, options);
         const chunks: BlobPart[] = [];
 
         mediaRecorder.ondataavailable = (e) => {
@@ -453,6 +497,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
         await new Promise(r => setTimeout(r, 150));
 
         v.muted = true;
+        sourceNode.start(0);
         await v.play();
         mediaRecorder.start(200);
 
@@ -494,54 +539,220 @@ const renderSubtitleText = (text: string, highlight: string) => {
                 if (effectEnabled && resolvedScript) {
                     const cTime = v.currentTime;
 
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    const cx = vw / 2;
+                    const cy = vh / 2;
+
                     // --- 常駐標籤 ---
-                    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-                    drawRoundedRect(ctx, 20 * scaleX, 20 * scaleY, 140 * scaleX, 28 * scaleY, 14 * Math.min(scaleX, scaleY));
-                    ctx.fillStyle = "#6d6d6d";
-                    ctx.font = `bold ${12 * scaleY}px sans-serif`;
-                    ctx.fillText("✨ ユキ&トモヤ｜日本實拍", 28 * scaleX, 39 * scaleY);
+                    if (!(resolvedScript.cover && cTime <= 3.5)) {
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+                        drawRoundedRect(ctx, 20 * scaleX, 20 * scaleY, 170 * scaleX, 28 * scaleY, 14 * Math.min(scaleX, scaleY));
+                        ctx.fillStyle = "#6d6d6d";
+                        ctx.font = `bold ${12 * scaleY}px sans-serif`;
+                        ctx.fillText("✨ ユキ&トモヤ｜日本實拍", 28 * scaleX, 34 * scaleY);
+                    }
 
                     // --- 封面 ---
-                    if (resolvedScript.cover && cTime <= 2.4) {
+                    if (resolvedScript.cover && cTime <= 3.5) {
                         ctx.fillStyle = "rgba(120, 196, 236, 0.9)";
                         ctx.fillRect(0, 0, vw, 40 * scaleY);
 
                         ctx.fillStyle = "#ffffff";
                         ctx.font = `bold ${14 * scaleY}px sans-serif`;
                         ctx.textAlign = "center";
-                        ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, vw / 2, 25 * scaleY);
+                        ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, cx, 20 * scaleY);
 
                         ctx.fillStyle = "#ffffff";
                         ctx.font = `bold ${36 * scaleY}px sans-serif`;
                         ctx.textAlign = "center";
                         ctx.shadowColor = "rgba(0,0,0,0.5)";
                         ctx.shadowBlur = 10;
-                        ctx.fillText(resolvedScript.cover.title, vw / 2, vh / 2 - 40 * scaleY);
-                    }
-
-                    // --- QA Card ---
-                    if (resolvedScript.qaCard && cTime >= resolvedScript.qaCard.start && cTime <= resolvedScript.qaCard.end) {
-                        ctx.fillStyle = "white";
-                        const cx = vw / 2;
-                        const cy = vh / 2;
-                        ctx.shadowColor = "rgba(0,0,0,0.1)";
-                        ctx.shadowBlur = 20 * scaleY;
-                        drawRoundedRect(ctx, cx - 150 * scaleX, cy - 60 * scaleY, 300 * scaleX, 120 * scaleY, 16 * Math.min(scaleX, scaleY));
+                        ctx.fillText(resolvedScript.cover.title, cx, cy - 40 * scaleY);
                         ctx.shadowBlur = 0;
 
-                        ctx.fillStyle = "#78C4EC";
-                        ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                        ctx.textAlign = "left";
-                        ctx.fillText(`● ${resolvedScript.qaCard.author}`, cx - 130 * scaleX, cy - 30 * scaleY);
+                        if (resolvedScript.cover.subtitle) {
+                            ctx.font = `bold ${16 * scaleY}px sans-serif`;
+                            ctx.fillText(resolvedScript.cover.subtitle, cx, cy + 10 * scaleY);
+                        }
+                    }
+
+                    // --- Active Events ---
+                    const activeEvts = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
+                    for (const evt of activeEvts) {
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+
+                        const eW = 320 * scaleX;
+                        const eH = 100 * scaleY;
+                        let eX = cx - eW/2;
+                        let eY = cy - eH/2;
+
+                        if (evt.side === 'left') { eX = 20 * scaleX; }
+                        else if (evt.side === 'right') { eX = vw - eW - 20 * scaleX; }
+
+                        if (evt.type === 'qa_bubble') {
+                            eY = vh * 0.2;
+                            ctx.fillStyle = "white";
+                            ctx.shadowColor = "rgba(0,0,0,0.2)";
+                            ctx.shadowBlur = 20 * scaleY;
+                            drawRoundedRect(ctx, eX, eY, eW, eH, 16 * Math.min(scaleX, scaleY));
+                            ctx.shadowBlur = 0;
+
+                            ctx.fillStyle = "#78C4EC";
+                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                            ctx.fillText(`● ${evt.author || 'Q&A'}`, eX + 20 * scaleX, eY + 30 * scaleY);
+
+                            ctx.fillStyle = "#333";
+                            ctx.font = `bold ${18 * scaleY}px sans-serif`;
+                            ctx.fillText(evt.title || evt.question || '', eX + 20 * scaleX, eY + 65 * scaleY);
+                        } else if (evt.type === 'myth_buster') {
+                            eY = cy - eH/2;
+                            ctx.fillStyle = "white";
+                            ctx.strokeStyle = "red";
+                            ctx.lineWidth = 4 * scaleY;
+                            drawRoundedRect(ctx, eX, eY, eW, eH, 16 * Math.min(scaleX, scaleY));
+                            ctx.stroke();
+
+                            ctx.fillStyle = "#333";
+                            ctx.font = `900 ${22 * scaleY}px sans-serif`;
+                            ctx.textAlign = "center";
+                            ctx.fillText(evt.title, eX + eW/2, eY + 40 * scaleY);
+
+                            if (evt.subtitle) {
+                                ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                                ctx.fillText(evt.subtitle, eX + eW/2, eY + 70 * scaleY);
+                            }
+                        } else if (evt.type === 'big_impact') {
+                            ctx.fillStyle = "white";
+                            ctx.font = `900 ${60 * scaleY}px sans-serif`;
+                            ctx.textAlign = "center";
+                            ctx.shadowColor = "rgba(0,0,0,0.8)";
+                            ctx.shadowBlur = 10;
+                            ctx.fillText(evt.title, cx, cy);
+                            ctx.shadowBlur = 0;
+
+                            if (evt.strikeThrough) {
+                                const m = ctx.measureText(evt.title);
+                                ctx.strokeStyle = "red";
+                                ctx.lineWidth = 8 * scaleY;
+                                ctx.beginPath();
+                                ctx.moveTo(cx - m.width/2, cy);
+                                ctx.lineTo(cx + m.width/2, cy);
+                                ctx.stroke();
+                            }
+                        } else if (evt.type === 'target_focus') {
+                            ctx.fillStyle = "rgba(255,255,255,0.9)";
+                            drawRoundedRect(ctx, cx - 100 * scaleX, cy + 60 * scaleY, 200 * scaleX, 30 * scaleY, 4 * scaleY);
+                            ctx.fillStyle = "#333";
+                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                            ctx.textAlign = "center";
+                            ctx.fillText(evt.title, cx, cy + 75 * scaleY);
+                        } else if (evt.type === 'numbered_pill') {
+                            const pW = 200 * scaleX;
+                            const pH = 40 * scaleY;
+                            const pY = 0.25 * vh + (allEvents.indexOf(evt) % 4) * 50 * scaleY;
+                            let pX = evt.side === 'left' ? 20 * scaleX : vw - pW - 20 * scaleX;
+
+                            ctx.fillStyle = "rgba(255,255,255,0.95)";
+                            drawRoundedRect(ctx, pX, pY, pW, pH, 20 * scaleY);
+
+                            ctx.fillStyle = "#78C4EC";
+                            ctx.beginPath();
+                            ctx.arc(pX + 20 * scaleX, pY + 20 * scaleY, 14 * scaleY, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            ctx.fillStyle = "white";
+                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                            ctx.textAlign = "center";
+                            ctx.fillText(String(evt.number || 1), pX + 20 * scaleX, pY + 21 * scaleY);
+
+                            ctx.fillStyle = "#333";
+                            ctx.textAlign = "left";
+                            ctx.fillText(evt.title, pX + 45 * scaleX, pY + 21 * scaleY);
+                        } else if (evt.type === 'icon_pill') {
+                            const pW = 220 * scaleX;
+                            const pH = 40 * scaleY;
+                            const pY = 0.1 * vh + (allEvents.indexOf(evt) % 4) * 50 * scaleY;
+                            let pX = evt.side === 'left' ? 20 * scaleX : vw - pW - 20 * scaleX;
+
+                            ctx.fillStyle = "rgba(255,255,255,0.95)";
+                            drawRoundedRect(ctx, pX, pY, pW, pH, 20 * scaleY);
+
+                            ctx.fillStyle = "#333";
+                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                            ctx.textAlign = "left";
+                            ctx.fillText(`${evt.icon || ''} ${evt.title}`, pX + 20 * scaleX, pY + 21 * scaleY);
+                        } else if (evt.type === 'warning_tape') {
+                            ctx.fillStyle = "rgba(0,0,0,0.8)";
+                            ctx.fillRect(0, vh * 0.4, vw, 60 * scaleY);
+                            ctx.fillStyle = "#facc15";
+                            ctx.fillRect(0, vh * 0.4, vw, 4 * scaleY);
+                            ctx.fillRect(0, vh * 0.4 + 56 * scaleY, vw, 4 * scaleY);
+
+                            ctx.fillStyle = "red";
+                            ctx.font = `900 ${20 * scaleY}px sans-serif`;
+                            ctx.textAlign = "center";
+                            ctx.fillText(`⚠️ ${evt.title}`, cx, vh * 0.4 + 30 * scaleY);
+                        } else if (evt.type === 'progress_card') {
+                            const pW = 300 * scaleX;
+                            const pH = 80 * scaleY;
+                            const pY = vh - pH - 100 * scaleY;
+
+                            ctx.fillStyle = "rgba(255,255,255,0.9)";
+                            drawRoundedRect(ctx, cx - pW/2, pY, pW, pH, 12 * scaleY);
+
+                            ctx.fillStyle = "#333";
+                            ctx.font = `800 ${16 * scaleY}px sans-serif`;
+                            ctx.textAlign = "left";
+                            ctx.fillText(evt.title, cx - pW/2 + 20 * scaleX, pY + 30 * scaleY);
+                        } else if (evt.type === 'checklist_card') {
+                            const cW = 320 * scaleX;
+                            const cH = 160 * scaleY;
+                            const cY = vh - cH - 40 * scaleY;
+
+                            ctx.fillStyle = "rgba(255,255,255,0.95)";
+                            drawRoundedRect(ctx, cx - cW/2, cY, cW, cH, 16 * scaleY);
+
+                            ctx.fillStyle = "#78C4EC";
+                            ctx.font = `800 ${16 * scaleY}px sans-serif`;
+                            ctx.textAlign = "left";
+                            ctx.fillText(`✓ ${evt.title}`, cx - cW/2 + 20 * scaleX, cY + 30 * scaleY);
+
+                            ctx.fillStyle = "#444";
+                            ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                            (evt.items || []).forEach((item, i) => {
+                                ctx.fillText(`■ ${item}`, cx - cW/2 + 20 * scaleX, cY + 70 * scaleY + i * 25 * scaleY);
+                            });
+                        }
+                    }
+
+                    // --- Outro ---
+                    const isOutro = resolvedScript.outro && duration > 10 && cTime >= duration - 3.8;
+                    if (isOutro && resolvedScript.outro) {
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+                        ctx.fillRect(0, 0, vw, vh);
+
+                        const oW = 340 * scaleX;
+                        const oH = 340 * scaleY;
+                        ctx.fillStyle = "white";
+                        drawRoundedRect(ctx, cx - oW/2, cy - oH/2, oW, oH, 24 * scaleY);
 
                         ctx.fillStyle = "#333";
-                        ctx.font = `bold ${18 * scaleY}px sans-serif`;
-                        ctx.fillText(resolvedScript.qaCard.question, cx - 130 * scaleX, cy + 10 * scaleY);
+                        ctx.font = `900 ${24 * scaleY}px sans-serif`;
+                        ctx.textAlign = "center";
+                        ctx.fillText(resolvedScript.outro.title, cx, cy - oH/2 + 60 * scaleY);
+
+                        ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                        ctx.textAlign = "left";
+                        (resolvedScript.outro.points || []).forEach((pt, i) => {
+                            ctx.fillText(pt, cx - oW/2 + 20 * scaleX, cy - oH/2 + 120 * scaleY + i * 35 * scaleY);
+                        });
                     }
 
                     // --- Subtitles ---
                     const sub = resolvedScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
-                    if (sub) {
+                    if (sub && !isOutro && !(resolvedScript.cover && cTime <= 3.5)) {
                         ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
                         const padX = 20 * scaleX;
                         const padY = 10 * scaleY;
@@ -571,6 +782,11 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
         const blob = await recordingPromise;
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+        try {
+            sourceNode.stop();
+            sourceNode.disconnect();
+        } catch (e) {}
 
         const file = new File([blob], 'yuki-tomoya-video.mp4', { type: 'video/mp4' });
         const objUrl = URL.createObjectURL(file);
@@ -616,6 +832,8 @@ const renderSubtitleText = (text: string, highlight: string) => {
           loop
           playsInline
           controls={false}
+          controlsList={!isPreviewMode ? "nodownload" : undefined}
+          onContextMenu={!isPreviewMode ? (e) => e.preventDefault() : undefined}
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
@@ -853,8 +1071,38 @@ const renderSubtitleText = (text: string, highlight: string) => {
               }
             })}
 
+            {/* Outro End Card */}
+            {activeEffects.outro && resolvedScript.outro && (
+              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
+                <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-white/20">
+                   <div className="inline-block px-3 py-1 mb-4 rounded-full text-xs font-bold bg-[#78C4EC]/10 text-[#78C4EC] border border-[#78C4EC]/20">
+                     {resolvedScript.outro.badge}
+                   </div>
+                   <h2 className="text-[#333] text-xl sm:text-2xl font-black mb-6 leading-tight">
+                     {resolvedScript.outro.title}
+                   </h2>
+                   <ul className="space-y-4 mb-6">
+                     {(resolvedScript.outro.points || []).map((pt, i) => (
+                       <li key={i} className="flex gap-3 text-[#444] text-sm sm:text-base font-bold leading-relaxed">
+                         <span>{pt.substring(0, 3)}</span>
+                         <span>{pt.substring(3)}</span>
+                       </li>
+                     ))}
+                   </ul>
+                   <div className="text-[#6d6d6d] text-xs font-bold text-center pt-4 border-t border-gray-100">
+                     {resolvedScript.outro.credit}
+                   </div>
+                </div>
+                {resolvedScript.outro.cta && (
+                  <div className="mt-6 bg-[#06C755] text-white px-6 py-3 rounded-full font-bold shadow-lg text-sm sm:text-base animate-bounce">
+                    {resolvedScript.outro.cta}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 6. 動態底部字幕 */}
-            {activeEffects.subtitle && !activeEffects.cover && (
+            {activeEffects.subtitle && !activeEffects.cover && !activeEffects.outro && (
               <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center px-4">
                 <div className="bg-slate-900/80 backdrop-blur-md rounded-full px-5 py-2.5 sm:px-6 sm:py-3 shadow-lg border border-white/10 text-center max-w-xs sm:max-w-md animate-in slide-in-from-bottom-2 fade-in duration-200">
                   <p className="text-white text-sm sm:text-base font-bold tracking-wide">
@@ -941,18 +1189,20 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     ⛶ 全螢幕放大
                   </button>
 
-                  <button
-                    onClick={() => { unlockAudio(); exportVideo(); }}
-                    disabled={(!resolvedScript) || !effectEnabled || isExporting}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
-                  >
-                    <Download className="w-4 h-4" />
-                    🎬 匯出 MP4 影片 (v4.0)
-                  </button>
+                  {isPreviewMode && (
+                    <button
+                      onClick={() => { unlockAudio(); exportVideo(); }}
+                      disabled={(!resolvedScript) || !effectEnabled || isExporting}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+                    >
+                      <Download className="w-4 h-4" />
+                      🎬 匯出有聲 MP4 影片 (v5.0)
+                    </button>
+                  )}
                 </div>
 
                 {/* 匯出結果區塊 */}
-                {exportedUrl && exportedFile && (
+                {isPreviewMode && exportedUrl && exportedFile && (
                   <div className="w-full max-w-sm sm:max-w-md bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm mt-2 flex flex-col gap-3">
                     <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
                       ✅ 影片已匯出成功！
