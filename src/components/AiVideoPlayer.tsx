@@ -182,6 +182,7 @@ export default function AiVideoPlayer({
   const lastUpdateRef = useRef<number>(0);
   const lastSeekRef = useRef<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const unlockAudio = useCallback(() => {
     if (videoRef.current) {
@@ -584,11 +585,14 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
                     // --- 常駐標籤 ---
                     if (!(resolvedScript.cover && cTime <= 3.5)) {
-                        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-                        drawRoundedRect(ctx, 20 * scaleX, 20 * scaleY, 170 * scaleX, 28 * scaleY, 14 * Math.min(scaleX, scaleY));
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
+                        drawRoundedRect(ctx, vw * 0.03, vh * 0.05, vw * 0.28, vh * 0.075, vh * 0.0375);
                         ctx.fillStyle = "#6d6d6d";
-                        ctx.font = `bold ${12 * scaleY}px sans-serif`;
-                        ctx.fillText("✨ ユキ&トモヤ｜日本實拍", 28 * scaleX, 34 * scaleY);
+                        ctx.textAlign = "left";
+                        ctx.textBaseline = "middle";
+                        ctx.font = `bold ${vh * 0.035}px sans-serif`;
+                        ctx.fillText("✨ ユキ&トモヤ｜日本實拍", vw * 0.03 + vw * 0.02, vh * 0.05 + vh * 0.0375);
+                        ctx.textBaseline = "alphabetic";
                     }
 
                     // --- 封面 ---
@@ -757,21 +761,40 @@ const renderSubtitleText = (text: string, highlight: string) => {
                             ctx.font = `bold ${vh * 0.03}px sans-serif`;
                             ctx.fillText(evt.title, pX + pH*1.1, pY + pH*0.5);
                         } else if (evt.type === 'target_focus') {
-                           ctx.strokeStyle = 'red';
-                           ctx.lineWidth = 4;
-                           ctx.setLineDash([15, 15]);
-                           ctx.beginPath();
-                           ctx.arc(cx, cy, 60 * scaleX, 0, 2*Math.PI);
-                           ctx.stroke();
-                           ctx.setLineDash([]);
+                           const tX = vw * 0.32;
+                           const tY = vh * 0.36;
+                           const radius1 = vh * 0.045;
+                           const radius2 = vh * 0.025;
 
-                           ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-                           const tw = ctx.measureText(evt.title).width + 20;
-                           drawRoundedRect(ctx, cx - tw/2, cy + 80 * scaleY, tw, 30 * scaleY, 4);
-                           ctx.fillStyle = "#333";
+                           ctx.strokeStyle = 'red';
+                           ctx.lineWidth = 3;
+                           ctx.setLineDash([10, 5]);
+                           ctx.beginPath();
+                           ctx.arc(tX, tY, radius1, 0, 2*Math.PI);
+                           ctx.stroke();
+
+                           ctx.strokeStyle = '#78C4EC';
+                           ctx.setLineDash([]);
+                           ctx.beginPath();
+                           ctx.arc(tX, tY, radius2, 0, 2*Math.PI);
+                           ctx.stroke();
+
+                           ctx.fillStyle = "red";
+                           ctx.beginPath();
+                           ctx.arc(tX, tY, 3, 0, 2*Math.PI);
+                           ctx.fill();
+
+                           ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+                           const pillText = `🎯 ${evt.title}｜${evt.subtitle}`;
+                           ctx.font = `bold ${vh * 0.025}px sans-serif`;
+                           const tw = ctx.measureText(pillText).width + 20;
+                           drawRoundedRect(ctx, tX + radius1 + 10, tY - vh * 0.02, tw, vh * 0.04, vh * 0.01);
+
+                           ctx.fillStyle = "#fff";
                            ctx.textAlign = "center";
-                           ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                           ctx.fillText(evt.title, cx, cy + 95 * scaleY);
+                           ctx.textBaseline = "middle";
+                           ctx.fillText(pillText, tX + radius1 + 10 + tw/2, tY);
+                           ctx.textBaseline = "alphabetic";
                         }
                     }
                     // --- Subtitles ---
@@ -918,7 +941,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
       {/* 全螢幕頂部列 */}
       {isFullscreen && (
         <>
-          <button onClick={() => setIsRotated(!isRotated)} className="absolute bottom-4 right-4 z-50 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
+          <button onClick={() => setIsRotated(!isRotated)} className="absolute top-4 left-4 z-50 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
             🔄 橫向滿版
           </button>
           <button onClick={() => { setIsFullscreen(false); setIsRotated(false); }} className="absolute top-4 right-4 z-50 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
@@ -928,7 +951,17 @@ const renderSubtitleText = (text: string, highlight: string) => {
       )}
 
       {/* 播放器容器 */}
-      <div onClick={unlockAudio} className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
+      <div onClick={(e) => {
+        unlockAudio();
+        // Ignore clicks on buttons/inputs
+        const target = e.target as HTMLElement;
+        if (target.closest('button') || target.tagName === 'BUTTON' || target.tagName === 'INPUT') return;
+        const v = videoRef.current;
+        if (v && hasStarted) {
+          if (v.paused) v.play().catch(() => { v.muted = true; v.play(); });
+          else v.pause();
+        }
+      }} className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
         <video
           ref={videoRef}
           src={videoUrl}
@@ -940,14 +973,14 @@ const renderSubtitleText = (text: string, highlight: string) => {
           controlsList={!isPreviewMode ? "nodownload" : undefined}
           onContextMenu={!isPreviewMode ? (e) => e.preventDefault() : undefined}
           onTimeUpdate={handleTimeUpdate}
-          onPlay={() => setIsPlaying(true)}
+          onPlay={() => { setIsPlaying(true); setHasStarted(true); }}
           onPause={() => setIsPlaying(false)}
           onLoadedMetadata={handleLoadedMetadata}
           className={videoClass}
         />
 
         {/* Playback Overlays */}
-        {!isPlaying && !isExporting && (
+        {!hasStarted && !isExporting && (
           <div className="absolute inset-0 z-40 pointer-events-auto flex items-center justify-center bg-black/40"
                onClick={() => {
                  const v = videoRef.current;
@@ -968,9 +1001,25 @@ const renderSubtitleText = (text: string, highlight: string) => {
           </div>
         )}
 
+        {hasStarted && !isPlaying && !isExporting && (
+          <div className="absolute inset-0 z-40 pointer-events-none flex items-center justify-center">
+            <div className="pointer-events-auto bg-black/50 text-white p-4 rounded-full backdrop-blur-sm cursor-pointer hover:bg-black/70 transition shadow-xl border border-white/20"
+                 onClick={(e) => {
+                   e.stopPropagation();
+                   const v = videoRef.current;
+                   if (v && v.paused) v.play().catch(() => { v.muted = true; v.play(); });
+                 }}
+            >
+              <div className="flex items-center gap-2 text-lg font-bold pr-2">
+                <span className="text-2xl">▶</span> 繼續播放
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Playback Bar */}
         {!isExporting && (
-          <div className="absolute bottom-0 left-0 right-0 z-40 pointer-events-auto bg-gradient-to-t from-black/80 to-transparent p-4 flex items-center justify-between transition-opacity duration-300 opacity-0 hover:opacity-100">
+          <div className="absolute bottom-2 left-3 right-3 z-40 flex items-center justify-between gap-2 bg-slate-900/75 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs pointer-events-auto shadow-lg border border-white/10">
              <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -980,13 +1029,30 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     else v.pause();
                   }
                 }}
-                className="text-white hover:text-[#78C4EC] transition"
+                className="hover:text-[#78C4EC] transition font-bold shrink-0"
              >
                 {isPlaying ? '⏸ 暫停' : '▶ 播放'}
              </button>
-             <div className="text-white/90 text-sm font-bold tracking-wider">
-                {formatTime(currentTime)} / {videoRef.current?.duration ? formatTime(videoRef.current.duration) : '0:00'}
+
+             <div className="flex-1 flex items-center gap-2 px-2">
+               <input
+                 type="range"
+                 min={0}
+                 max={videoRef.current?.duration || 71}
+                 step={0.1}
+                 value={currentTime}
+                 onChange={(e) => {
+                   const t = parseFloat(e.target.value);
+                   if (videoRef.current) videoRef.current.currentTime = t;
+                   setCurrentTime(t);
+                 }}
+                 className="flex-1 accent-sky-400 h-1 cursor-pointer"
+               />
+               <span className="font-bold tracking-wider shrink-0 text-[10px] sm:text-xs">
+                 {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 71)}
+               </span>
              </div>
+
              <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -994,12 +1060,22 @@ const renderSubtitleText = (text: string, highlight: string) => {
                   if (v) {
                     v.muted = !v.muted;
                     setIsVideoMuted(v.muted);
+                    setSoundEnabled(!v.muted);
                   }
                 }}
-                className="text-white hover:text-[#78C4EC] transition"
+                className="hover:text-[#78C4EC] transition font-bold shrink-0"
              >
-                {isVideoMuted ? '🔇 靜音' : '🔊 聲音開'}
+                {isVideoMuted ? '🔇 已靜音' : '🔊 聲音：開'}
              </button>
+
+             {!isFullscreen && (
+               <button
+                 onClick={(e) => { e.stopPropagation(); unlockAudio(); setIsFullscreen(true); }}
+                 className="hover:text-[#78C4EC] transition font-bold shrink-0 ml-1 border-l border-white/20 pl-2"
+               >
+                 ⛶ 放大
+               </button>
+             )}
           </div>
         )}
 
@@ -1010,8 +1086,8 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
             {/* 常駐左上角標籤 */}
             {!activeEffects.cover && (
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 bg-white/85 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-white/50">
-                <span className="text-[10px] sm:text-xs font-bold text-[#6d6d6d]">✨ ユキ&トモヤ｜日本實拍</span>
+              <div className="absolute z-10 flex items-center justify-center bg-white/95 px-3 rounded-full shadow-sm border border-white/50" style={{ top: '5%', left: '3%', width: '28%', height: '7.5%' }}>
+                <span className="font-bold text-[#6d6d6d] whitespace-nowrap" style={{ fontSize: '3.5cqh' }}>✨ ユキ&トモヤ｜日本實拍</span>
               </div>
             )}
 
@@ -1126,14 +1202,14 @@ const renderSubtitleText = (text: string, highlight: string) => {
                   );
                 case 'target_focus':
                   return (
-                    <div key={evt.id} className={`absolute z-20 flex items-center justify-center ${baseAnim}`} style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                       <div className="relative flex items-center justify-center">
-                          <div className="absolute w-24 h-24 border-2 border-dashed border-red-500 rounded-full animate-[spin_4s_linear_infinite]" />
-                          <div className="absolute w-32 h-32 border border-[#78C4EC] rounded-full animate-ping opacity-50" />
+                    <div key={evt.id} className={`absolute z-20 ${baseAnim}`} style={{ top: '36%', left: '32%' }}>
+                       <div className="absolute flex items-center justify-center" style={{ transform: 'translate(-50%, -50%)' }}>
+                          <div className="absolute border-2 border-dashed border-red-500 rounded-full animate-[spin_4s_linear_infinite]" style={{ width: '9vh', height: '9vh' }} />
+                          <div className="absolute border border-[#78C4EC] rounded-full animate-ping opacity-50" style={{ width: '5vh', height: '5vh' }} />
                           <div className="w-2 h-2 bg-red-500 rounded-full" />
                        </div>
-                       <div className="absolute top-16 bg-white/90 px-3 py-1 rounded text-[#333] font-bold text-sm shadow-md whitespace-nowrap">
-                         {evt.title}
+                       <div className="absolute top-[-2vh] left-[5.5vh] bg-black/85 text-white px-3 py-1.5 rounded-full font-bold text-[1.8vh] shadow-xl whitespace-nowrap border border-white/20">
+                         🎯 {evt.title}｜{evt.subtitle}
                        </div>
                     </div>
                   );
@@ -1208,7 +1284,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
             {/* 6. 動態底部字幕 */}
             {activeEffects.subtitle && !activeEffects.cover && !activeEffects.outro && (
-              <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center px-4">
+              <div className="absolute bottom-12 left-0 right-0 z-30 flex justify-center px-4">
                 <div className="bg-slate-900/80 backdrop-blur-md rounded-full px-5 py-2.5 sm:px-6 sm:py-3 shadow-lg border border-white/10 text-center max-w-xs sm:max-w-md animate-in slide-in-from-bottom-2 fade-in duration-200">
                   <p className="text-white text-sm sm:text-base font-bold tracking-wide">
                     {renderSubtitleText(activeEffects.subtitle.text, activeEffects.subtitle.highlight)}
@@ -1219,16 +1295,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
           </div>
         )}
 
-        {/* Floating Fullscreen button */}
-        {!isFullscreen && (
-          <button
-            onClick={() => { unlockAudio(); setIsFullscreen(true); }}
-            className="absolute bottom-3 right-3 z-40 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur transition shadow-lg flex items-center justify-center"
-            title="全螢幕放大"
-          >
-            ⛶ 放大
-          </button>
-        )}
+
 
         {/* Exporting Overlay */}
         {isExporting && (
@@ -1248,6 +1315,40 @@ const renderSubtitleText = (text: string, highlight: string) => {
           {/* 控制列 */}
                 <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-sm border border-[#bbe3f8] mt-2 w-full max-w-sm sm:max-w-md">
                   <button
+                    onClick={() => {
+                      unlockAudio();
+                      const v = videoRef.current;
+                      if (v) {
+                        if (v.paused) v.play().catch(() => { v.muted = true; v.play(); });
+                        else v.pause();
+                      }
+                    }}
+                    disabled={isExporting}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#333] hover:bg-gray-200"
+                  >
+                    {isPlaying ? '⏸ 暫停影片' : '▶ 播放影片'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      unlockAudio();
+                      const v = videoRef.current;
+                      if (v) {
+                        v.muted = !v.muted;
+                        setIsVideoMuted(v.muted);
+                      }
+                    }}
+                    disabled={isExporting}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+                      !isVideoMuted
+                        ? "bg-[#bbe3f8] text-[#333] shadow-sm hover:bg-[#a9d9f2]"
+                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+                    }`}
+                  >
+                    {!isVideoMuted ? "🔊 影片聲音：開" : "🔇 影片聲音：靜音"}
+                  </button>
+
+                  <button
                     onClick={() => { unlockAudio(); setEffectEnabled(!effectEnabled); }}
                     disabled={(!resolvedScript) || isExporting}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
@@ -1258,20 +1359,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     }`}
                   >
                     {effectEnabled ? <Sparkles className="w-4 h-4" /> : <Film className="w-4 h-4" />}
-                    {effectEnabled ? "✨ AI 特效開啟" : "🎬 原始影片"}
-                  </button>
-
-                  <button
-                    onClick={() => { unlockAudio(); setSoundEnabled(!soundEnabled); }}
-                    disabled={(!resolvedScript) || isExporting || !effectEnabled}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-                      !effectEnabled ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-                      soundEnabled
-                        ? "bg-[#bbe3f8] text-[#333] shadow-sm hover:bg-[#a9d9f2]"
-                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-                    }`}
-                  >
-                    {soundEnabled ? "🔊 特效音：開" : "🔇 特效音：關"}
+                    {effectEnabled ? "✨ AI 特效" : "🎬 原始影片"}
                   </button>
 
                   <button
@@ -1301,7 +1389,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v5.2)
+                      🎬 匯出有聲 MP4 影片 (v5.3)
                     </button>
                   )}
                 </div>
