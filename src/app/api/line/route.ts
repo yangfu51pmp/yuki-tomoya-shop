@@ -64,6 +64,8 @@ export async function GET(req: NextRequest) {
         site_announcement: "",
         site_announcement_url: "",
         site_hero_image: "",
+        preview_video: "",
+        preview_ai_script: null,
         _t,
       });
     }
@@ -126,7 +128,7 @@ export async function GET(req: NextRequest) {
     const [
       site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation,
       cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8,
-      cat_products_1, cat_products_2, cat_products_3, video_ai_script
+      cat_products_1, cat_products_2, cat_products_3, video_ai_script, preview_video, preview_ai_script
     ] = await Promise.all([
       client.get("yt_site_title"),
       client.get("yt_site_announcement"),
@@ -148,6 +150,8 @@ export async function GET(req: NextRequest) {
       client.get("yt_cat_products_2"),
       client.get("yt_cat_products_3"),
       client.get("yt_video_ai_script"),
+      client.get("yt_preview_video"),
+      client.get("yt_preview_ai_script"),
     ]);
     await client.quit();
 
@@ -173,6 +177,8 @@ export async function GET(req: NextRequest) {
         cat_products_2: cat_products_2 ? JSON.parse(cat_products_2) : null,
         cat_products_3: cat_products_3 ? JSON.parse(cat_products_3) : null,
         video_ai_script: video_ai_script ? JSON.parse(video_ai_script) : null,
+        preview_video: preview_video || "",
+        preview_ai_script: preview_ai_script ? JSON.parse(preview_ai_script) : null,
       },
       {
         headers: {
@@ -587,16 +593,17 @@ async function callOpenRouterJson(prompt: string, models: string[]): Promise<{ s
 }
 
 // GitHub 程式碼修改核心（用於服務項目文字、顏色、版面調整）
-async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
+async function uploadVideoToGitHub(base64Content: string, isPreview: boolean = false): Promise<string | null> {
   const githubToken = (process.env.GITHUB_TOKEN || '').trim();
   if (!githubToken) {
     console.error("No GITHUB_TOKEN provided.");
-    return false;
+    return null;
   }
 
   try {
     let sha = "";
-    // 1. 取得 public 目錄檔案列表，尋找 promo.mp4 以取得 sha
+    const filename = isPreview ? `preview-video-${Date.now()}.mp4` : "promo.mp4";
+    // 1. 取得 public 目錄檔案列表，尋找檔案以取得 sha
     const listRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/contents/public`, {
       headers: {
         Authorization: `Bearer ${githubToken}`,
@@ -606,16 +613,16 @@ async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
 
     if (listRes.ok) {
       const files = await listRes.json();
-      const existingFile = files.find((f: { name: string; sha: string }) => f.name === "promo.mp4");
+      const existingFile = files.find((f: { name: string; sha: string }) => f.name === filename);
       if (existingFile) {
         sha = existingFile.sha;
       }
     }
 
     // 2. 上傳或覆蓋檔案
-    const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/public/promo.mp4`;
+    const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/public/${filename}`;
     const putBody: { message: string; content: string; branch: string; sha?: string } = {
-      message: "Update promo.mp4 via LINE bot",
+      message: `Update ${filename} via LINE bot`,
       content: base64Content,
       branch: "main",
     };
@@ -636,13 +643,13 @@ async function uploadVideoToGitHub(base64Content: string): Promise<boolean> {
     if (!putRes.ok) {
       const errText = await putRes.text();
       console.error("GitHub API upload failed:", errText);
-      return false;
+      return null;
     }
 
-    return true;
+    return filename;
   } catch (error) {
     console.error("uploadVideoToGitHub error:", error);
-    return false;
+    return null;
   }
 }
 
@@ -924,7 +931,7 @@ export async function POST(req: NextRequest) {
                 const existingData = await client.get(listKey);
                 if (existingData) {
                   let products = JSON.parse(existingData);
-                  products = products.map((p: any) => {
+                  products = products.map((p: { id: string }) => {
                     if (p.id === productId) {
                       return { ...p, imageUrl: `/${filename}` };
                     }
@@ -1016,13 +1023,20 @@ export async function POST(req: NextRequest) {
                 const arrayBuffer = await videoRes.arrayBuffer();
                 const b64 = Buffer.from(arrayBuffer).toString("base64");
 
-                const uploadSuccess = await uploadVideoToGitHub(b64);
+                const pendingAiVideo = await client.get("yt_pending_ai_video");
+                const isAiPreview = !!pendingAiVideo;
 
-                if (uploadSuccess) {
+                const uploadedFilename = await uploadVideoToGitHub(b64, isAiPreview);
+
+                if (uploadedFilename) {
                   const siteUrl = req.nextUrl.origin;
-                  const newVideoUrl = `${siteUrl}/promo.mp4?v=${Date.now()}`;
+                  const newVideoUrl = `${siteUrl}/${uploadedFilename}?v=${Date.now()}`;
 
-                  await client.set("yt_site_promo_video", newVideoUrl);
+                  if (isAiPreview) {
+                    await client.set("yt_preview_video", newVideoUrl);
+                  } else {
+                    await client.set("yt_site_promo_video", newVideoUrl);
+                  }
 
                   // Fetch and save video thumbnail
                   try {
@@ -1043,7 +1057,6 @@ export async function POST(req: NextRequest) {
                     console.error("Failed to fetch video preview:", e);
                   }
 
-                  const pendingAiVideo = await client.get("yt_pending_ai_video");
                   if (pendingAiVideo) {
                     await client.del("yt_pending_ai_video");
                     let aiSuccess = false;
@@ -1123,15 +1136,26 @@ export async function POST(req: NextRequest) {
 
                       jsonString = jsonString.replace(/```json/gi, '').replace(/```/g, '').trim();
                       if (jsonString) {
-                         JSON.parse(jsonString); // Validate
-                         await client.set("yt_video_ai_script", jsonString);
+                         const parsedJson = JSON.parse(jsonString); // Validate
+                         await client.set("yt_preview_ai_script", jsonString);
                          aiSuccess = true;
+
+                         const summary = `1️⃣ 【封面標題】: ${parsedJson.cover?.title || '無'}\n2️⃣ 【Q&A 提問】: ${parsedJson.qaCard?.question || '無'}\n3️⃣ 【①②③ 重點】: ${parsedJson.numberedPills?.map((p: { text: string }) => p.text).join('、') || '無'}`;
+
+                         await replyLine(
+                           replyToken,
+                           `✅ 🎬 已收到您的影片！AI 導演已經完成看片聽音，為您成功生成專屬動態雜誌風腳本！\n\n【AI 腳本摘要】\n${summary}\n\n🔍 **專屬預覽試片連結**：\nhttps://yuki-tomoya-shop.vercel.app/?preview=video\n\n💬 後續操作指令：\n- 確認無誤請輸入：確認上架影片\n- 想調整字卡或字幕請輸入：修改製片：[您的修改要求]\n- 放棄請輸入：取消上架影片`
+                         , undefined, targetId, startTime);
                       }
                     } catch (e) {
                       console.error("AI Video script generation failed", e);
                     }
                     if (!aiSuccess) {
-                      await client.set("yt_video_ai_script", "null");
+                      await client.set("yt_preview_ai_script", "null");
+                      await replyLine(
+                        replyToken,
+                        "❌ AI 影片腳本生成失敗，請稍後再試。"
+                      , undefined, targetId, startTime);
                     }
                   } else {
                     await client.set("yt_video_ai_script", "null");
@@ -1142,12 +1166,7 @@ export async function POST(req: NextRequest) {
 
                   try { revalidatePath("/"); } catch {}
 
-                  if (pendingAiVideo) {
-                    await replyLine(
-                      replyToken,
-                      "✅ 🎬 已收到您的影片！AI 導演已經完成看片聽音，為您成功生成專屬動態雜誌風腳本！\nGitHub 已更新並在 Vercel 部署中（約 20 秒後生效），請於首頁查看 AI 自動製片成果！"
-                    , undefined, targetId, startTime);
-                  } else {
+                  if (!pendingAiVideo) {
                     await replyLine(
                       replyToken,
                       "✅ 已成功接收您的影片（自動適配橫式／直式比例）並推送至 GitHub！Vercel 正在背景部署中（約 20 秒後生效），稍後請輸入『截圖』驗收！"
@@ -1312,7 +1331,7 @@ export async function POST(req: NextRequest) {
         }
 
         const initialLength = products.length;
-        products = products.filter((p: any) => !p.name.includes(searchKeyword));
+        products = products.filter((p: { name: string }) => !p.name.includes(searchKeyword));
         const removedCount = initialLength - products.length;
 
         if (removedCount > 0) {
@@ -1551,6 +1570,121 @@ export async function POST(req: NextRequest) {
         await client.quit();
         try { revalidatePath("/"); } catch {}
         await replyLine(replyToken, "✨ 已開啟影片特效！", undefined, targetId, startTime);
+        continue;
+      }
+
+      // 確認上架影片
+      const confirmPublishMatch = cleanText.match(/^(?:確認|同意|正式)?(?:上架|發布|公開)(?:AI)?影片$/);
+      if (confirmPublishMatch && REDIS_URL) {
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        const previewVideo = await client.get("yt_preview_video");
+        const previewScript = await client.get("yt_preview_ai_script");
+
+        if (previewVideo || previewScript) {
+          if (previewVideo) await client.set("yt_site_promo_video", previewVideo);
+          if (previewScript) await client.set("yt_video_ai_script", previewScript);
+
+          await client.del("yt_preview_video");
+          await client.del("yt_preview_ai_script");
+
+          await client.quit();
+          try { revalidatePath("/"); } catch {}
+
+          await new Promise((resolve) => setTimeout(resolve, 20000));
+          const screenshot = await captureWebsiteScreenshot();
+          await replyLine(
+            replyToken,
+            "✅ 已確認！AI 製片成果已正式公開上架至官網首頁！",
+            screenshot,
+            targetId,
+            startTime
+          );
+        } else {
+          await client.quit();
+          await replyLine(replyToken, "目前沒有正在預覽的影片可以上架。", undefined, targetId, startTime);
+        }
+        continue;
+      }
+
+      // 重新製片
+      const modifyAiMatch = cleanText.match(/^(?:修改|調整|重新)(?:AI)?(?:製片|剪片|字幕|字卡)[:：]\s*(.+)$/);
+      if (modifyAiMatch && REDIS_URL && OPENROUTER_API_KEY) {
+        const userModification = modifyAiMatch[1];
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        let rawScript = await client.get("yt_preview_ai_script");
+        if (!rawScript || rawScript === "null") {
+          rawScript = await client.get("yt_video_ai_script");
+        }
+
+        if (rawScript && rawScript !== "null") {
+          const prompt = `你是一個影片腳本修改助手。請根據以下使用者的要求，修改現有的 JSON 腳本。
+
+現有腳本：
+\`\`\`json
+${rawScript}
+\`\`\`
+
+使用者要求：
+${userModification}
+
+請直接回傳完整的修改後 JSON 腳本，不要包含任何其他文字或 \`\`\` 標記。`;
+
+          let updatedJsonString = '';
+          try {
+            const fallbackRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
+               body: JSON.stringify({
+                 model: 'openai/gpt-4o',
+                 messages: [{ role: 'user', content: prompt }]
+               })
+            });
+            if (fallbackRes.ok) {
+                const fallbackData = await fallbackRes.json();
+                updatedJsonString = fallbackData?.choices?.[0]?.message?.content || '';
+                updatedJsonString = updatedJsonString.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+                if (updatedJsonString) {
+                  const parsedJson = JSON.parse(updatedJsonString);
+                  await client.set("yt_preview_ai_script", updatedJsonString);
+
+                  const summary = `1️⃣ 【封面標題】: ${parsedJson.cover?.title || '無'}\n2️⃣ 【Q&A 提問】: ${parsedJson.qaCard?.question || '無'}\n3️⃣ 【①②③ 重點】: ${parsedJson.numberedPills?.map((p: { text: string }) => p.text).join('、') || '無'}`;
+
+                  await replyLine(
+                    replyToken,
+                    `✅ 已根據您的要求完成修改！\n\n【更新後的 AI 腳本摘要】\n${summary}\n\n🔍 **專屬預覽試片連結**：\nhttps://yuki-tomoya-shop.vercel.app/?preview=video\n\n💬 後續操作指令：\n- 確認無誤請輸入：確認上架影片\n- 放棄請輸入：取消上架影片`,
+                    undefined,
+                    targetId,
+                    startTime
+                  );
+                } else {
+                  await replyLine(replyToken, "❌ 修改失敗，AI 未能產生有效的腳本。", undefined, targetId, startTime);
+                }
+            } else {
+              await replyLine(replyToken, "❌ 修改失敗，無法連線至 AI 服務。", undefined, targetId, startTime);
+            }
+          } catch(e) {
+             console.error("Modify AI script error", e);
+             await replyLine(replyToken, "❌ 修改失敗，發生錯誤。", undefined, targetId, startTime);
+          }
+        } else {
+          await replyLine(replyToken, "目前沒有可以修改的 AI 影片腳本。", undefined, targetId, startTime);
+        }
+        await client.quit();
+        continue;
+      }
+
+      // 取消預覽
+      const cancelAiMatch = cleanText.match(/^(?:取消上架影片|取消製片)$/);
+      if (cancelAiMatch && REDIS_URL) {
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        await client.del("yt_preview_video");
+        await client.del("yt_preview_ai_script");
+        await client.quit();
+        await replyLine(replyToken, "✅ 已取消本次預覽，官網維持原狀。", undefined, targetId, startTime);
         continue;
       }
 
