@@ -99,6 +99,10 @@ export default function AiVideoPlayer({
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRotated, setIsRotated] = useState(false);
+  const [exportedFile, setExportedFile] = useState<File | null>(null);
+  const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
   const playedSfxRef = useRef<Set<string>>(new Set());
 
@@ -320,15 +324,21 @@ export default function AiVideoPlayer({
         const vh = videoRef.current.videoHeight;
 
         // Set canvas to video intrinsic size
-        canvas.width = vw;
-        canvas.height = vh;
+        canvas.width = Math.floor(vw / 2) * 2;
+        canvas.height = Math.floor(vh / 2) * 2;
 
         // 建立離線錄製器
         const stream = canvas.captureStream(30); // 30 fps
-        const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+        let options: MediaRecorderOptions = { mimeType: 'video/mp4;codecs=avc1' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
+            options = { mimeType: 'video/mp4' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
+                options = { mimeType: 'video/webm;codecs=vp8,opus' };
+            }
+        }
 
         // Ensure MediaRecorder is supported
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        if (!options.mimeType || !MediaRecorder.isTypeSupported(options.mimeType)) {
              console.warn(`${options.mimeType} is not supported, using default.`);
              // eslint-disable-next-line @typescript-eslint/no-explicit-any
              delete (options as any).mimeType;
@@ -345,7 +355,7 @@ export default function AiVideoPlayer({
 
         const recordingPromise = new Promise<Blob>((resolve) => {
             mediaRecorder.onstop = () => {
-                resolve(new Blob(chunks, { type: chunks[0] instanceof Blob ? chunks[0].type : 'video/webm' }));
+                resolve(new Blob(chunks, { type: options.mimeType || 'video/mp4' }));
             };
         });
 
@@ -506,12 +516,10 @@ export default function AiVideoPlayer({
         const blob = await recordingPromise;
 
         // Download
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `exported_video.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const file = new File([blob], 'yuki-tomoya-video.mp4', { type: 'video/mp4' });
+        const objUrl = URL.createObjectURL(file);
+        setExportedFile(file);
+        setExportedUrl(objUrl);
 
     } catch (err) {
         console.error("Export error:", err);
@@ -529,9 +537,21 @@ export default function AiVideoPlayer({
 
 
   return (
-    <div className="flex flex-col items-center gap-4 w-full">
+    <div className={`flex flex-col items-center gap-4 w-full ${isFullscreen ? 'fixed inset-0 z-[99999] bg-black/95 justify-center h-[100dvh]' : ''}`}>
+      {/* 全螢幕頂部列 */}
+      {isFullscreen && (
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
+          <button onClick={() => setIsRotated(!isRotated)} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
+            🔄 橫向滿版
+          </button>
+          <button onClick={() => { setIsFullscreen(false); setIsRotated(false); }} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-bold text-sm backdrop-blur transition">
+            ✕ 關閉全螢幕
+          </button>
+        </div>
+      )}
+
       {/* 播放器容器 */}
-      <div className={containerClass} ref={containerRef}>
+      <div className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
         <video
           ref={videoRef}
           src={videoUrl}
@@ -728,6 +748,17 @@ export default function AiVideoPlayer({
           </div>
         )}
 
+        {/* Floating Fullscreen button */}
+        {!isFullscreen && (
+          <button
+            onClick={() => setIsFullscreen(true)}
+            className="absolute bottom-3 right-3 z-40 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur transition shadow-lg flex items-center justify-center"
+            title="全螢幕放大"
+          >
+            ⛶ 放大
+          </button>
+        )}
+
         {/* Exporting Overlay */}
         {isExporting && (
             <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6 backdrop-blur-sm">
@@ -784,14 +815,56 @@ export default function AiVideoPlayer({
         </button>
 
         <button
+          onClick={() => setIsFullscreen(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+        >
+          ⛶ 全螢幕放大
+        </button>
+
+        <button
           onClick={exportVideo}
           disabled={!aiScript || !effectEnabled || isExporting}
           className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
         >
           <Download className="w-4 h-4" />
-          匯出影片
+          🎬 匯出 MP4 影片 (v2.0)
         </button>
       </div>
+
+      {/* 匯出結果區塊 */}
+      {exportedUrl && exportedFile && (
+        <div className="w-full max-w-sm sm:max-w-md bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm mt-2 flex flex-col gap-3">
+          <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
+            ✅ 影片已匯出成功！
+          </div>
+          <video src={exportedUrl} controls playsInline className="w-full rounded-lg shadow-sm border border-emerald-100" />
+
+          <button
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({
+                  title: 'Yuki & Tomoya Video',
+                  files: [exportedFile]
+                }).catch(console.error);
+              } else {
+                alert('您的裝置不支援快速分享功能，請長按影片或點擊下方按鈕下載');
+              }
+            }}
+            className="w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+          >
+            📲 儲存到 iPhone 相簿 / 傳送至 LINE
+          </button>
+
+          <div className="flex flex-col gap-2 mt-1">
+            <a href={exportedUrl} download="yuki-tomoya-video.mp4" className="text-center text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 py-2 rounded-lg transition">
+              ⬇ 下載 MP4 檔案
+            </a>
+            <a href={videoUrl} download="original-video.mp4" className="text-center text-xs font-bold text-stone-500 hover:text-stone-600 bg-stone-100/50 py-2 rounded-lg transition">
+              ⬇ 下載原始 MP4 影片
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* 隱藏樣式，用於動態類別產生 */}
       <style dangerouslySetInnerHTML={{ __html: `
