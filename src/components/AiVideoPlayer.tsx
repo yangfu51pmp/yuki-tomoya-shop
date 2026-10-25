@@ -50,6 +50,25 @@ interface AiScript {
     end: number;
     text: string;
     highlight: string;
+    color?: string;
+  }>;
+  events?: Array<{
+    id: string;
+    type: string;
+    start: number;
+    end: number;
+    side?: "left" | "right" | "center";
+    title: string;
+    subtitle?: string;
+    items?: string[];
+    number?: number;
+    icon?: string;
+    badge?: string;
+    strikeThrough?: boolean;
+    zoom?: boolean;
+    sfx?: "pop" | "whoosh" | "ding" | "alert";
+    author?: string; // For qa_bubble backward compat
+    question?: string; // For qa_bubble backward compat
   }>;
 }
 
@@ -69,18 +88,118 @@ export default function AiVideoPlayer({
 
   // Local toggle for effect without changing redis
   const [effectEnabled, setEffectEnabled] = useState(aiScript?.enabled !== false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+
+  const playedSfxRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEffectEnabled(aiScript?.enabled !== false);
   }, [aiScript?.enabled]);
 
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playSfx = useCallback((type: 'pop' | 'whoosh' | 'ding' | 'alert') => {
+    if (!soundEnabled) return;
+    try {
+      if (!audioContextRef.current) {
+        const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
+        if (!AudioContext) return;
+        audioContextRef.current = new AudioContext();
+      }
+      const ctx = audioContextRef.current;
+
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'pop') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(350, t);
+        osc.frequency.exponentialRampToValueAtTime(850, t + 0.05);
+        gain.gain.setValueAtTime(0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.09);
+        osc.start(t);
+        osc.stop(t + 0.1);
+      } else if (type === 'ding') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(987, t);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1318, t);
+        gain2.gain.setValueAtTime(0.3, t);
+        gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
+        osc.start(t);
+        osc2.start(t);
+        osc.stop(t + 0.3);
+        osc2.stop(t + 0.3);
+      } else if (type === 'whoosh') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(50, t + 0.18);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+        gain.gain.linearRampToValueAtTime(0.01, t + 0.18);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      } else if (type === 'alert') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, t);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(220, t + 0.12);
+        gain2.gain.setValueAtTime(0, t);
+        gain2.gain.setValueAtTime(0.3, t + 0.12);
+        gain2.gain.linearRampToValueAtTime(0.01, t + 0.22);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
+        osc.start(t);
+        osc2.start(t + 0.12);
+        osc.stop(t + 0.11);
+        osc2.stop(t + 0.23);
+      }
+    } catch (e) {
+      console.log('Web Audio API not supported or interaction required', e);
+    }
+  }, [soundEnabled]);
+
   const handleTimeUpdate = () => {
     if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+      const cTime = videoRef.current.currentTime;
+      setCurrentTime(cTime);
+
+      // Reset sounds if video loops or restarts
+      if (cTime < 0.5) {
+        playedSfxRef.current.clear();
+      }
+
+      if (effectEnabled && aiScript) {
+        const events = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
+        events.forEach(evt => {
+          if (evt.sfx && !playedSfxRef.current.has(evt.id)) {
+            playedSfxRef.current.add(evt.id);
+            playSfx(evt.sfx as 'pop' | 'whoosh' | 'ding' | 'alert');
+          }
+        });
+      }
     }
   };
 
@@ -89,19 +208,34 @@ export default function AiVideoPlayer({
     setIsVertical(target.videoHeight > target.videoWidth);
   };
 
+  // Backward compatibility: Convert old elements to new events
+  const allEvents = (aiScript?.events || []).slice();
+  if (aiScript && allEvents.length === 0) {
+     if (aiScript.qaCard) {
+         allEvents.push({ id: 'legacy_qa', type: 'qa_bubble', start: aiScript.qaCard.start, end: aiScript.qaCard.end, author: aiScript.qaCard.author, title: aiScript.qaCard.question, sfx: 'pop' });
+     }
+     if (aiScript.numberedPills) {
+         aiScript.numberedPills.forEach((p, i) => allEvents.push({ id: `legacy_pill_${i}`, type: 'numbered_pill', start: p.start, end: p.end, number: p.number, title: p.text, side: p.side, sfx: 'pop' }));
+     }
+     if (aiScript.bigKeywords) {
+         aiScript.bigKeywords.forEach((k, i) => allEvents.push({ id: `legacy_keyword_${i}`, type: 'big_impact', start: k.start, end: k.end, title: k.text, badge: k.badge, zoom: true, sfx: 'whoosh' }));
+     }
+     if (aiScript.checklistCard) {
+         allEvents.push({ id: 'legacy_checklist', type: 'checklist_card', start: aiScript.checklistCard.start, end: aiScript.checklistCard.end, title: aiScript.checklistCard.title, items: aiScript.checklistCard.items, sfx: 'ding' });
+     }
+  }
+
   const activeEffects = {
     cover: aiScript?.cover && currentTime >= 0 && currentTime <= 2.5,
-    qa: aiScript?.qaCard && currentTime >= aiScript.qaCard.start && currentTime <= aiScript.qaCard.end,
-    numberedPills: aiScript?.numberedPills?.filter((p) => currentTime >= p.start && currentTime <= p.end) || [],
-    bigKeyword: aiScript?.bigKeywords?.find((k) => currentTime >= k.start && currentTime <= k.end),
-    checklist: aiScript?.checklistCard && currentTime >= aiScript.checklistCard.start && currentTime <= aiScript.checklistCard.end,
     subtitle: aiScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
+    events: allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end),
   };
 
-  const isZoomed = effectEnabled && (activeEffects.checklist || activeEffects.bigKeyword);
+  const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
+  const isZoomed = effectEnabled && hasZoomEvent;
 
-  const videoClass = `w-full h-full object-cover transition-transform duration-700 ease-in-out ${
-    isZoomed ? "scale-105" : "scale-100"
+  const videoClass = `w-full h-full object-cover transition-transform duration-500 ease-out ${
+    isZoomed ? "scale-[1.08]" : "scale-100"
   }`;
 
   const containerClass = isVertical
@@ -432,74 +566,120 @@ export default function AiVideoPlayer({
               </div>
             )}
 
-            {/* 2. Q&A 卡片 */}
-            {activeEffects.qa && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in zoom-in duration-300">
-                <div className="bg-white/95 backdrop-blur-lg rounded-2xl p-6 sm:p-8 shadow-2xl border border-white/50 w-full max-w-sm mx-auto flex flex-col gap-4 transform -translate-y-8">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#78C4EC]" />
-                    <span className="text-[#78C4EC] font-bold text-xs sm:text-sm tracking-wider uppercase">
-                      {aiScript.qaCard?.author}
-                    </span>
-                  </div>
-                  <h2 className="text-[#333] text-lg sm:text-xl font-extrabold leading-relaxed">
-                    {aiScript.qaCard?.question}
-                  </h2>
-                </div>
-              </div>
-            )}
+            {/* 動態事件渲染 (9 種 EventType) */}
+            {activeEffects.events.map((evt, idx) => {
+              const baseAnim = "animate-in fade-in zoom-in-95 duration-200";
+              const positionProps = evt.side === "left" ? { left: "1rem" } : evt.side === "right" ? { right: "1rem" } : { left: "1rem", right: "1rem", margin: "0 auto" };
 
-            {/* 3. 編號重點膠囊 */}
-            {activeEffects.numberedPills.map((pill, idx) => (
-              <div
-                key={`pill-${idx}`}
-                className={`absolute z-20 top-[${30 + idx * 15}%] sm:top-[${25 + idx * 15}%] ${
-                  pill.side === "left" ? "left-4 slide-in-from-left" : "right-4 slide-in-from-right"
-                } flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-full pr-4 pl-1.5 py-1.5 shadow-lg border border-[#bbe3f8]/50 animate-in fade-in duration-500`}
-                style={{ top: `${25 + idx * 15}%` }}
-              >
-                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#78C4EC] flex items-center justify-center text-white font-extrabold text-sm sm:text-base">
-                  {pill.number}
-                </div>
-                <span className="text-[#555] font-bold text-xs sm:text-sm">{pill.text}</span>
-              </div>
-            ))}
-
-            {/* 4. 背景視覺大字 */}
-            {activeEffects.bigKeyword && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none mix-blend-overlay">
-                <h2 className="text-white text-7xl sm:text-8xl md:text-9xl font-black uppercase tracking-tighter opacity-80 scale-in-center rotate-[-5deg]">
-                  {activeEffects.bigKeyword.text}
-                </h2>
-              </div>
-            )}
-            {activeEffects.bigKeyword?.badge && (
-               <div className="absolute top-20 right-6 z-20 bg-yellow-400 text-black font-black px-3 py-1 text-sm sm:text-base rounded-md rotate-12 shadow-lg animate-bounce">
-                  {activeEffects.bigKeyword.badge}
-               </div>
-            )}
-
-            {/* 5. 推薦清單勾選卡 */}
-            {activeEffects.checklist && (
-              <div className="absolute inset-0 z-20 flex flex-col justify-end p-6 pb-24 sm:pb-32 bg-gradient-to-t from-black/60 to-transparent">
-                <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-5 shadow-xl border border-white/60 w-full max-w-sm slide-in-bottom">
-                  <h3 className="text-[#6db3e0] font-extrabold text-sm sm:text-base mb-3 flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-[#78C4EC]" />
-                    {aiScript.checklistCard?.title}
-                  </h3>
-                  <ul className="space-y-2">
-                    {aiScript.checklistCard?.items.map((item, i) => (
-                      <li key={i} className="flex items-center gap-2 text-[#444] font-bold text-xs sm:text-sm">
-                        <div className="w-4 h-4 rounded bg-[#78C4EC]/20 flex items-center justify-center">
-                           <div className="w-2 h-2 rounded-sm bg-[#78C4EC]" />
+              switch (evt.type) {
+                case 'qa_bubble':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 top-[20%] flex w-full justify-center px-4 ${baseAnim}`}>
+                      <div className="bg-white/95 backdrop-blur-lg rounded-2xl p-5 sm:p-6 shadow-2xl border border-white/50 max-w-sm w-full">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#78C4EC]" />
+                          <span className="text-[#78C4EC] font-bold text-xs tracking-wider">{evt.author || "Q&A"}</span>
                         </div>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
+                        <h2 className="text-[#333] text-lg font-extrabold leading-tight">{evt.title || evt.question}</h2>
+                      </div>
+                    </div>
+                  );
+                case 'myth_buster':
+                  return (
+                    <div key={evt.id} className={`absolute inset-0 z-20 flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm ${baseAnim}`}>
+                      <div className="bg-white/95 rounded-2xl p-6 shadow-2xl max-w-xs text-center border-4 border-red-500 relative">
+                        <div className="absolute -top-8 -left-8 text-6xl drop-shadow-md text-red-500 rotate-[-15deg]">🚫</div>
+                        <h2 className="text-[#333] text-xl font-black mt-2">{evt.title}</h2>
+                      </div>
+                    </div>
+                  );
+                case 'numbered_pill':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-full pr-4 pl-1.5 py-1.5 shadow-lg border border-[#bbe3f8]/50 ${baseAnim}`} style={{ top: `${25 + idx * 12}%`, ...positionProps }}>
+                      <div className="w-7 h-7 rounded-full bg-[#78C4EC] flex items-center justify-center text-white font-extrabold text-sm">{evt.number}</div>
+                      <span className="text-[#555] font-bold text-sm">{evt.title}</span>
+                    </div>
+                  );
+                case 'icon_pill':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-full pr-4 pl-2 py-1.5 shadow-lg border border-gray-200 ${baseAnim}`} style={{ top: `${10 + idx * 10}%`, ...positionProps }}>
+                      <span className="text-lg">{evt.icon}</span>
+                      <span className="text-[#333] font-bold text-sm">{evt.title}</span>
+                    </div>
+                  );
+                case 'big_impact':
+                  return (
+                    <div key={evt.id} className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none mix-blend-overlay ${baseAnim}`}>
+                      <h2 className={`text-white text-5xl sm:text-7xl font-black uppercase tracking-wider drop-shadow-lg scale-in-center rotate-[-5deg] ${evt.strikeThrough ? 'line-through decoration-red-500 decoration-8' : ''}`}>
+                        {evt.title}
+                      </h2>
+                      {evt.badge && (
+                        <div className="absolute top-[30%] left-[20%] z-20 bg-red-600 text-white font-black px-4 py-2 text-xl rounded-md rotate-[-20deg] shadow-2xl border-2 border-white animate-bounce">
+                          {evt.badge}
+                        </div>
+                      )}
+                    </div>
+                  );
+                case 'warning_tape':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 top-[40%] left-0 w-full flex items-center justify-center py-3 shadow-2xl border-y-4 border-black ${baseAnim}`} style={{ backgroundImage: 'repeating-linear-gradient(45deg, #facc15, #facc15 12px, #1e293b 12px, #1e293b 24px)' }}>
+                      <div className="bg-black/80 px-6 py-1 rounded border border-yellow-400 flex items-center gap-2">
+                        <span className="text-xl">⚠️</span>
+                        <span className="text-red-500 font-black text-xl tracking-widest">{evt.title}</span>
+                      </div>
+                    </div>
+                  );
+                case 'target_focus':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 flex items-center justify-center ${baseAnim}`} style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                       <div className="relative flex items-center justify-center">
+                          <div className="absolute w-24 h-24 border-2 border-dashed border-red-500 rounded-full animate-[spin_4s_linear_infinite]" />
+                          <div className="absolute w-32 h-32 border border-[#78C4EC] rounded-full animate-ping opacity-50" />
+                          <div className="w-2 h-2 bg-red-500 rounded-full" />
+                       </div>
+                       <div className="absolute top-16 bg-white/90 px-3 py-1 rounded text-[#333] font-bold text-sm shadow-md whitespace-nowrap">
+                         {evt.title}
+                       </div>
+                    </div>
+                  );
+                case 'progress_card':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 bottom-24 left-0 right-0 mx-auto max-w-xs w-[90%] bg-white/90 backdrop-blur rounded-xl p-4 shadow-xl ${baseAnim}`}>
+                       <div className="flex justify-between items-center mb-2">
+                          <span className="text-[10px] font-bold text-white bg-[#78C4EC] px-2 py-0.5 rounded">{evt.badge || 'FEATURE'}</span>
+                          <span className="text-lg">{evt.icon}</span>
+                       </div>
+                       <h3 className="text-[#333] font-extrabold text-sm mb-2">{evt.title}</h3>
+                       <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                          <div className="bg-[#78C4EC] h-2 rounded-full w-[80%] animate-[pulse_2s_ease-in-out_infinite]" />
+                       </div>
+                    </div>
+                  );
+                case 'checklist_card':
+                  return (
+                    <div key={evt.id} className={`absolute z-20 inset-0 flex flex-col justify-end p-6 pb-28 bg-gradient-to-t from-black/60 to-transparent ${baseAnim}`}>
+                      <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-5 shadow-xl border border-white/60 w-full max-w-sm mx-auto">
+                        <h3 className="text-[#6db3e0] font-extrabold text-sm sm:text-base mb-3 flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-[#78C4EC]" />
+                          {evt.title}
+                        </h3>
+                        <ul className="space-y-2">
+                          {(evt.items || []).map((item, i) => (
+                            <li key={i} className="flex items-center gap-2 text-[#444] font-bold text-sm">
+                              <div className="w-4 h-4 rounded bg-[#78C4EC]/20 flex items-center justify-center">
+                                 <div className="w-2 h-2 rounded-sm bg-[#78C4EC]" />
+                              </div>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                default:
+                  return null;
+              }
+            })}
 
             {/* 6. 動態底部字幕 */}
             {activeEffects.subtitle && !activeEffects.cover && (
@@ -544,9 +724,22 @@ export default function AiVideoPlayer({
         </button>
 
         <button
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          disabled={!aiScript || isExporting || !effectEnabled}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+            !effectEnabled ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
+            soundEnabled
+              ? "bg-[#bbe3f8] text-[#333] shadow-sm hover:bg-[#a9d9f2]"
+              : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+          }`}
+        >
+          {soundEnabled ? "🔊 特效音：開" : "🔇 特效音：關"}
+        </button>
+
+        <button
           onClick={exportVideo}
           disabled={!aiScript || !effectEnabled || isExporting}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
         >
           <Download className="w-4 h-4" />
           匯出影片
