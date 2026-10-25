@@ -835,7 +835,11 @@ ${currentContent}`;
 }
 
 async function analyzeVideoWithAI(videoBuffer: Buffer | null, userHint: string) {
-  const scriptPrompt = `請分析這段影片內容（包含畫面與語音），這是一個日系商品選物平台（ユキ&トモヤ）的宣傳短片，主題是「日本商品開箱介紹」。請為這段影片執行「兩階段高密度 AI 影音導演引擎」分析，並輸出單一完整且嚴格的 JSON 格式（不要加上 \`\`\`json 標籤，純粹輸出 JSON）。
+  const scriptPrompt = `請分析這段影片內容（包含畫面與語音），這是一個日系商品選物平台（ユキ&トモヤ：由台灣家庭經營的日本選物代購與台日少棒棒球訓練交流平台，包含日本仙台草野塾（草野大輔教練）指導兒子智也（Tomoya）的棒球特訓、KUMON教材文具、日本保健與生活好物）的宣傳短片。
+嚴格要求：
+- 必須 100% 逐字翻譯並生成覆蓋全片時間軸的中文字幕！
+- 絕對不要憑空捏造無關的開箱物品，例如香水瓶 (香水瓶) 或禮物盒 (禮物盒)！
+請為這段影片執行「兩階段高密度 AI 影音導演引擎」分析，並輸出單一完整且嚴格的 JSON 格式（不要加上 \`\`\`json 標籤，純粹輸出 JSON）。
 
 【任務一：100% 逐句對嘴字幕（subtitles 陣列）與✂️ AI 氣口剪輯（speechSegments 陣列）】
 1. 嚴禁濃縮或省略！必須將影片中講者說的「每一句話、每一個短句」100% 完整聽寫出來（若原片為日文，請轉譯為自然流暢的繁體中文字幕或中日對照；若原片無說話聲，則依畫面動作每 2 秒生成一句精準的現場解說旁白字幕）。每個字幕片段長度控制在 1.2 秒 ～ 3.0 秒之間，精準標註 start 與 end 秒數。每句字幕必須挑出 1 個核心關鍵詞填入 highlight，並指定 color（'sky'、'coral'、'amber' 交替）。
@@ -867,13 +871,22 @@ JSON 輸出結構範例：
   "events": [ ... ]
 }
 
-請根據你觀察到的影片長度、語音節奏和畫面動作，合理分配 start 和 end 時間。請務必直接返回合法的 JSON 字串。${userHint ? `\n另外請注意使用者的修改要求（如果無關則忽略）：${userHint}` : ""}`;
+請根據你觀察到的影片長度、語音節奏和畫面動作，合理分配 start 和 end 時間。請務必直接返回合法的 JSON 字串。
+如果影片過大，請嘗試參考原廠網址分析：https://raw.githubusercontent.com/${REPO_FULL_NAME}/main/public/preview-video.mp4${userHint ? `\n另外請注意使用者的修改要求（如果無關則忽略）：${userHint}` : ""}`;
 
   let jsonString = '';
 
   const isVideoAvailable = videoBuffer && videoBuffer.byteLength > 0;
-  const isVideoSmallEnough = isVideoAvailable && videoBuffer.byteLength < 18 * 1024 * 1024;
-  const b64 = isVideoAvailable ? videoBuffer.toString("base64") : "";
+  const isVideoSmallEnough = isVideoAvailable && videoBuffer.byteLength < 14 * 1024 * 1024;
+  let b64 = "";
+  if (isVideoAvailable) {
+    if (videoBuffer.byteLength > 14 * 1024 * 1024) {
+      // slice the first 12MB of the buffer to not exceed body size limit
+      b64 = videoBuffer.subarray(0, 12 * 1024 * 1024).toString("base64");
+    } else {
+      b64 = videoBuffer.toString("base64");
+    }
+  }
   const mimeType = "video/mp4";
 
   // Priority 1: OpenRouter google/gemini-2.0-flash-001
@@ -1214,7 +1227,7 @@ export async function POST(req: NextRequest) {
                     let aiSuccess = false;
                     try {
                       const parsedAi = JSON.parse(pendingAiVideo);
-                      const hint = parsedAi.hint || "日本商品開箱介紹";
+                      const hint = parsedAi.hint || "";
                       const parsedJson = await analyzeVideoWithAI(Buffer.from(arrayBuffer), hint);
                       if (parsedJson) {
                          await client.set("yt_preview_ai_script", JSON.stringify(parsedJson));
