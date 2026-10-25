@@ -45,6 +45,11 @@ interface AiScript {
     start: number;
     end: number;
   };
+  speechSegments?: Array<{
+    start: number;
+    end: number;
+    zoomLevel: 1 | 1.07;
+  }>;
   subtitles?: Array<{
     start: number;
     end: number;
@@ -89,6 +94,8 @@ export default function AiVideoPlayer({
   // Local toggle for effect without changing redis
   const [effectEnabled, setEffectEnabled] = useState(aiScript?.enabled !== false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [cutEnabled, setCutEnabled] = useState(false);
+  const [currentSpeechZoom, setCurrentSpeechZoom] = useState<number>(1);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -191,6 +198,29 @@ export default function AiVideoPlayer({
         playedSfxRef.current.clear();
       }
 
+      // AI Gap Cutting & Auto Zoom
+      if (cutEnabled && aiScript?.speechSegments && aiScript.speechSegments.length > 0) {
+        const segments = aiScript.speechSegments;
+        let inSegment = false;
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          if (cTime >= seg.start && cTime <= seg.end) {
+            inSegment = true;
+            setCurrentSpeechZoom(seg.zoomLevel);
+            break;
+          }
+        }
+
+        if (!inSegment) {
+          const nextSeg = segments.find(s => s.start > cTime);
+          if (nextSeg) {
+            videoRef.current.currentTime = nextSeg.start;
+          }
+        }
+      } else {
+        setCurrentSpeechZoom(1);
+      }
+
       if (effectEnabled && aiScript) {
         const events = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
         events.forEach(evt => {
@@ -234,8 +264,12 @@ export default function AiVideoPlayer({
   const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
   const isZoomed = effectEnabled && hasZoomEvent;
 
+  let scaleClass = "scale-100";
+  if (isZoomed) scaleClass = "scale-[1.08]";
+  else if (cutEnabled && currentSpeechZoom === 1.07) scaleClass = "scale-[1.07]";
+
   const videoClass = `w-full h-full object-cover transition-transform duration-500 ease-out ${
-    isZoomed ? "scale-[1.08]" : "scale-100"
+    scaleClass
   }`;
 
   const containerClass = isVertical
@@ -475,7 +509,7 @@ export default function AiVideoPlayer({
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `exported_video_${Date.now()}.webm`;
+        a.download = `exported_video.webm`;
         a.click();
         URL.revokeObjectURL(url);
 
@@ -734,6 +768,19 @@ export default function AiVideoPlayer({
           }`}
         >
           {soundEnabled ? "🔊 特效音：開" : "🔇 特效音：關"}
+        </button>
+
+        <button
+          onClick={() => setCutEnabled(!cutEnabled)}
+          disabled={!aiScript || isExporting}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+            !aiScript ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
+            cutEnabled
+              ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
+              : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
+          }`}
+        >
+          {cutEnabled ? "✂️ 氣口剪輯：開" : "✂️ 氣口剪輯：關"}
         </button>
 
         <button
