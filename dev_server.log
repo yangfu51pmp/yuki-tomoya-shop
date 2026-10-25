@@ -5,8 +5,13 @@
 ▲ Next.js 16.4.2 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.0.2:3000
-✓ Ready in 626ms
-✓ Running next.config.ts took 63ms
+✓ Ready in 600ms
+✓ Running next.config.ts took 50ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
 
   To migrate automatically, run:
@@ -17,9 +22,260 @@
 - Partial Prefetching enabled
 
 ○ Compiling / ...
- GET / 200 in 4.1s (next.js: 3.7s, proxy.ts: 143ms, application-code: 291ms)
- GET /api/line?t=1792850090748 200 in 2.9s (next.js: 2.7s, proxy.ts: 26ms, application-code: 165ms)
- GET /api/line?t=1792850090742 200 in 2.9s (next.js: 2.9s, proxy.ts: 35ms, application-code: 6ms)
- GET / 200 in 147ms (next.js: 60ms, proxy.ts: 7ms, application-code: 80ms)
- GET /api/line?t=1792850154269 200 in 70ms (next.js: 51ms, proxy.ts: 12ms, application-code: 7ms)
- GET /api/line?t=1792850154265 200 in 85ms (next.js: 68ms, proxy.ts: 12ms, application-code: 6ms)
+ GET /?preview=video 200 in 6.2s (next.js: 5.6s, proxy.ts: 205ms, application-code: 372ms)
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RedirectBoundary>
+      <RedirectErrorBoundary router={{...}}>
+        <InnerLayoutRouter url="/?preview=..." tree={[...]} params={{}} renderTree={{...}} segmentPath={[...]} ...>
+          <SegmentViewNode type="page" pagePath="src/page.tsx">
+            <SegmentTrieNode>
+            <ClientPageRoot Component={function HomePage} serverProvidedParams={null}>
+              <HomePage params={Promise} searchParams={Promise}>
+                <div className="min-h-scre...">
+                  <style>
+                  <aside>
+                  <header>
+                  <main className="flex-1">
+                    <div>
+                    <section>
+                    <section id="video" className="bg-[#EBF6F...">
+                      <div className="max-w-5xl ...">
+                        <div>
+                        <AiVideoPlayer videoUrl="https://as..." aiScript={null} poster={undefined}>
+                          <div className={"flex fle..."}>
+                            <div onClick={function AiVideoPlayer.useCallback[unlockAudio]} className={"w-full m..."} ...>
+                              <video
+                                ref={{current:null}}
+                                src="https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-la..."
+                                poster={undefined}
+                                autoPlay={true}
+                                loop={true}
+                                playsInline={true}
+                                controls={false}
++                               controlsList={undefined}
+-                               controlsList="nodownload"
+                                onContextMenu={undefined}
+                                onTimeUpdate={function handleTimeUpdate}
+                                onPlay={function onPlay}
+                                onPause={function onPause}
+                                onLoadedMetadata={function handleLoadedMetadata}
+                                className="w-full h-full object-cover transition-transform duration-500 ease-out scale..."
+                              >
+                              ...
+                            <div className="flex flex-...">
+                              <button>
+                              <button>
+                              <button>
+                              <button>
++                             <button
++                               onClick={function onClick}
++                               disabled={false}
++                               className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white tex..."
++                             >
+                            ...
+                    ...
+                  ...
+          ...
+        ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at button (<anonymous>)
+    at AiVideoPlayer (src/components/AiVideoPlayer.tsx:1171:21)
+    at <unknown> (src/app/page.tsx:328:21)
+    at HomePage (src/app/page.tsx:331:16)
+  1169 |
+  1170 |                   {isPreviewMode && (
+> 1171 |                     <button
+       |                     ^
+  1172 |                       onClick={() => { unlockAudio(); exportVideo(); }}
+  1173 |                       disabled={(!resolvedScript) || !effectEnabled || isExporting}
+  1174 |                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed...
+ GET /api/line?t=1792926558489 200 in 2.3s (next.js: 2.1s, proxy.ts: 16ms, application-code: 187ms)
+ GET /?preview=video 200 in 116ms (next.js: 32ms, proxy.ts: 7ms, application-code: 77ms)
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RedirectBoundary>
+      <RedirectErrorBoundary router={{...}}>
+        <InnerLayoutRouter url="/?preview=..." tree={[...]} params={{}} renderTree={{...}} segmentPath={[...]} ...>
+          <SegmentViewNode type="page" pagePath="src/page.tsx">
+            <SegmentTrieNode>
+            <ClientPageRoot Component={function HomePage} serverProvidedParams={null}>
+              <HomePage params={Promise} searchParams={Promise}>
+                <div className="min-h-scre...">
+                  <style>
+                  <aside>
+                  <header>
+                  <main className="flex-1">
+                    <div>
+                    <section>
+                    <section id="video" className="bg-[#EBF6F...">
+                      <div className="max-w-5xl ...">
+                        <div>
+                        <AiVideoPlayer videoUrl="https://as..." aiScript={null} poster={undefined}>
+                          <div className={"flex fle..."}>
+                            <div onClick={function AiVideoPlayer.useCallback[unlockAudio]} className={"w-full m..."} ...>
+                              <video
+                                ref={{current:null}}
+                                src="https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-la..."
+                                poster={undefined}
+                                autoPlay={true}
+                                loop={true}
+                                playsInline={true}
+                                controls={false}
++                               controlsList={undefined}
+-                               controlsList="nodownload"
+                                onContextMenu={undefined}
+                                onTimeUpdate={function handleTimeUpdate}
+                                onPlay={function onPlay}
+                                onPause={function onPause}
+                                onLoadedMetadata={function handleLoadedMetadata}
+                                className="w-full h-full object-cover transition-transform duration-500 ease-out scale..."
+                              >
+                              ...
+                            <div className="flex flex-...">
+                              <button>
+                              <button>
+                              <button>
+                              <button>
++                             <button
++                               onClick={function onClick}
++                               disabled={false}
++                               className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white tex..."
++                             >
+                            ...
+                    ...
+                  ...
+          ...
+        ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at button (<anonymous>)
+    at AiVideoPlayer (src/components/AiVideoPlayer.tsx:1171:21)
+    at <unknown> (src/app/page.tsx:328:21)
+    at HomePage (src/app/page.tsx:331:16)
+  1169 |
+  1170 |                   {isPreviewMode && (
+> 1171 |                     <button
+       |                     ^
+  1172 |                       onClick={() => { unlockAudio(); exportVideo(); }}
+  1173 |                       disabled={(!resolvedScript) || !effectEnabled || isExporting}
+  1174 |                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed...
+ GET /api/line?t=1792926611169 200 in 51ms (next.js: 35ms, proxy.ts: 8ms, application-code: 8ms)
+ GET /?preview=video 200 in 99ms (next.js: 24ms, proxy.ts: 8ms, application-code: 66ms)
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RedirectBoundary>
+      <RedirectErrorBoundary router={{...}}>
+        <InnerLayoutRouter url="/?preview=..." tree={[...]} params={{}} renderTree={{...}} segmentPath={[...]} ...>
+          <SegmentViewNode type="page" pagePath="src/page.tsx">
+            <SegmentTrieNode>
+            <ClientPageRoot Component={function HomePage} serverProvidedParams={null}>
+              <HomePage params={Promise} searchParams={Promise}>
+                <div className="min-h-scre...">
+                  <style>
+                  <aside>
+                  <header>
+                  <main className="flex-1">
+                    <div>
+                    <section>
+                    <section id="video" className="bg-[#EBF6F...">
+                      <div className="max-w-5xl ...">
+                        <div>
+                        <AiVideoPlayer videoUrl="https://as..." aiScript={null} poster={undefined}>
+                          <div className={"flex fle..."}>
+                            <div onClick={function AiVideoPlayer.useCallback[unlockAudio]} className={"w-full m..."} ...>
+                              <video
+                                ref={{current:null}}
+                                src="https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-la..."
+                                poster={undefined}
+                                autoPlay={true}
+                                loop={true}
+                                playsInline={true}
+                                controls={false}
++                               controlsList={undefined}
+-                               controlsList="nodownload"
+                                onContextMenu={undefined}
+                                onTimeUpdate={function handleTimeUpdate}
+                                onPlay={function onPlay}
+                                onPause={function onPause}
+                                onLoadedMetadata={function handleLoadedMetadata}
+                                className="w-full h-full object-cover transition-transform duration-500 ease-out scale..."
+                              >
+                              ...
+                            <div className="flex flex-...">
+                              <button>
+                              <button>
+                              <button>
+                              <button>
++                             <button
++                               onClick={function onClick}
++                               disabled={false}
++                               className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white tex..."
++                             >
+                            ...
+                    ...
+                  ...
+          ...
+        ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at button (<anonymous>)
+    at AiVideoPlayer (src/components/AiVideoPlayer.tsx:1171:21)
+    at <unknown> (src/app/page.tsx:328:21)
+    at HomePage (src/app/page.tsx:331:16)
+  1169 |
+  1170 |                   {isPreviewMode && (
+> 1171 |                     <button
+       |                     ^
+  1172 |                       onClick={() => { unlockAudio(); exportVideo(); }}
+  1173 |                       disabled={(!resolvedScript) || !effectEnabled || isExporting}
+  1174 |                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed...
+ GET /api/line?t=1792926626867 200 in 96ms (next.js: 80ms, proxy.ts: 9ms, application-code: 7ms)
+[browser] Export error: Error: Cannot determine video duration
+    at AiVideoPlayer.useCallback[exportVideo] (src/components/AiVideoPlayer.tsx:434:19)
+    at onClick (src/components/AiVideoPlayer.tsx:1172:55)
+    at button (<anonymous>)
+    at AiVideoPlayer (src/components/AiVideoPlayer.tsx:1171:21)
+    at <unknown> (src/app/page.tsx:328:21)
+    at HomePage (src/app/page.tsx:331:16)
+  432 |
+  433 |         if (!duration || !isFinite(duration)) {
+> 434 |             throw new Error("Cannot determine video duration");
+      |                   ^
+  435 |         }
+  436 |
+  437 |         const canvas = document.createElement("canvas"); (src/components/AiVideoPlayer.tsx:775:17)

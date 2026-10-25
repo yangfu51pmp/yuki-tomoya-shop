@@ -445,46 +445,26 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
         const canvasStream = canvas.captureStream(30);
 
-        // -- Audio Decoding --
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        const actx = new AudioContextClass();
-        const audioDest = actx.createMediaStreamDestination();
-        exportDestRef.current = audioDest;
-
-        const res = await fetch(videoUrl);
-        const arrayBuffer = await res.arrayBuffer();
-        const audioBuffer = await actx.decodeAudioData(arrayBuffer);
-
-        const sourceNode = actx.createBufferSource();
-        sourceNode.buffer = audioBuffer;
-        sourceNode.connect(audioDest);
-        // sourceNode will be started right before v.play()
-
-        const combinedStream = new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            ...audioDest.stream.getAudioTracks()
-        ]);
-
-        let options: MediaRecorderOptions = { mimeType: 'video/mp4;codecs=avc1' };
-        if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
-            options = { mimeType: 'video/mp4' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
-                options = { mimeType: 'video/webm;codecs=vp8,opus' };
-            }
-        }
-        if (!options.mimeType || !MediaRecorder.isTypeSupported(options.mimeType)) {
-             delete (options as any).mimeType;
-        }
-
-        const mediaRecorder = new MediaRecorder(combinedStream, options);
         const chunks: BlobPart[] = [];
+        let mediaRecorder: MediaRecorder;
+        const selectedMime = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+
+        try {
+            mediaRecorder = selectedMime
+                ? new MediaRecorder(canvasStream, { mimeType: selectedMime })
+                : new MediaRecorder(canvasStream);
+            mediaRecorder.start(200);
+        } catch (err1) {
+            mediaRecorder = new MediaRecorder(canvasStream);
+            mediaRecorder.start(200);
+        }
 
         mediaRecorder.ondataavailable = (e) => {
             if (e.data.size > 0) chunks.push(e.data);
         };
 
         const recordingPromise = new Promise<Blob>((resolve) => {
-            mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: options.mimeType || 'video/mp4' }));
+            mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: mediaRecorder.mimeType || 'video/mp4' }));
         });
 
         // Fast forward export wait for 0
@@ -497,9 +477,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
         await new Promise(r => setTimeout(r, 150));
 
         v.muted = true;
-        sourceNode.start(0);
         await v.play();
-        mediaRecorder.start(200);
 
         const containerRect = containerRef.current.getBoundingClientRect();
         const scaleX = vw / containerRect.width;
@@ -782,11 +760,6 @@ const renderSubtitleText = (text: string, highlight: string) => {
 
         const blob = await recordingPromise;
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
-
-        try {
-            sourceNode.stop();
-            sourceNode.disconnect();
-        } catch (e) {}
 
         const file = new File([blob], 'yuki-tomoya-video.mp4', { type: 'video/mp4' });
         const objUrl = URL.createObjectURL(file);
@@ -1196,7 +1169,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v5.0)
+                      🎬 匯出完整 MP4 影片 (v5.1)
                     </button>
                   )}
                 </div>
