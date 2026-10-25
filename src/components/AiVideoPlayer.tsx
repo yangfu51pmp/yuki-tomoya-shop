@@ -460,7 +460,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
         const scaleX = vw / containerRect.width;
         const scaleY = vh / containerRect.height;
 
-        let animationFrameId: number;
+        let animationFrameId: number | undefined;
         const drawFrame = async () => {
             if (v.ended || v.currentTime >= duration - 0.15) {
                 mediaRecorder.stop();
