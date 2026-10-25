@@ -302,10 +302,6 @@ export default function HomePage() {
                     />
                   );
                 } else {
-                  const videoClass = isVerticalVideo
-                    ? "max-w-[360px] w-full mx-auto aspect-[9/16] object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#bbe3f8]/40"
-                    : "w-full max-w-4xl mx-auto aspect-video object-contain bg-black rounded-2xl shadow-xl border-4 border-white ring-1 ring-[#bbe3f8]/40";
-
                   if (isScreenshotMode && sitePromoPoster) {
                     const screenshotContainerClass = isVerticalVideo
                       ? "max-w-[360px] mx-auto w-full relative overflow-hidden"
