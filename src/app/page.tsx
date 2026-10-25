@@ -19,6 +19,7 @@ export default function HomePage() {
   // 動態綁定影片區塊
   const [sitePromoVideo, setSitePromoVideo] = useState("https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-large.mp4");
   const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ ユキ&トモヤ 日本現場連線實拍");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [aiScript, setAiScript] = useState<any>(null);
 
   // 分類圖片
@@ -51,6 +52,9 @@ export default function HomePage() {
   // 截圖與封面圖模式支援
   const [sitePromoPoster, setSitePromoPoster] = useState("");
   const [isScreenshotMode, setIsScreenshotMode] = useState(false);
+
+  // 預覽模式
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   useEffect(() => {
     // 1. 若網址帶有即時預覽參數，優先同步顯示（確保 LINE 截圖 100% 零延遲拍到最新文字）
@@ -108,7 +112,14 @@ export default function HomePage() {
         if (data?.cat_products_2 && data.cat_products_2.length > 0) setCatProducts2(data.cat_products_2);
         if (data?.cat_products_3 && data.cat_products_3.length > 0) setCatProducts3(data.cat_products_3);
 
-        if (data?.video_ai_script) setAiScript(data.video_ai_script);
+        const isPreview = new URLSearchParams(window.location.search).get("preview") === "video";
+        if (isPreview) {
+          setIsPreviewMode(true);
+          if (data?.preview_video) setSitePromoVideo(data.preview_video);
+          if (data?.preview_ai_script) setAiScript(data.preview_ai_script);
+        } else {
+          if (data?.video_ai_script) setAiScript(data.video_ai_script);
+        }
       })
       .catch((err) => console.error("讀取網站動態設定失敗:", err));
   }, []);
@@ -228,6 +239,11 @@ export default function HomePage() {
 
       {/* 4. Hero 主視覺（動態顯示 Redis 主標題） */}
       <main className="flex-1">
+        {isPreviewMode && (
+          <div className="bg-[#78C4EC] text-white text-center py-3 font-bold text-sm shadow-md animate-pulse z-50 relative">
+            🎬 目前為【AI 製片審核預覽模式】（尚未公開，確認無誤請回 LINE 輸入『確認上架影片』）
+          </div>
+        )}
         <div className="bg-[#78C4EC] hover:bg-[#6db3e0] text-white text-center pb-4 pt-1 relative">
           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[16px] border-t-[#78C4EC] z-30"></div>
         </div>

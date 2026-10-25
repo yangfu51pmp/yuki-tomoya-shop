@@ -74,6 +74,7 @@ export default function AiVideoPlayer({
   const [exportProgress, setExportProgress] = useState(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEffectEnabled(aiScript?.enabled !== false);
   }, [aiScript?.enabled]);
 
@@ -161,6 +162,7 @@ export default function AiVideoPlayer({
         // Ensure MediaRecorder is supported
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
              console.warn(`${options.mimeType} is not supported, using default.`);
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
              delete (options as any).mimeType;
         }
 
