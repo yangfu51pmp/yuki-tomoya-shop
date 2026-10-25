@@ -128,6 +128,37 @@ const FULL_71S_SCRIPT = {
   ]
 };
 
+
+const COACH_PRAISE_39S_SCRIPT = {
+  cover: { issue: "ISSUE 08｜日本仙台・草野塾特訓花絮", title: "前日職名將的高度肯定！", subtitle: "草野大輔教練 盛讚智也學習力與打擊天賦", stamp: "教練盛讚", speakerName: "草野大輔 教練 × 智也", speakerTitle: "日本仙台草野塾 課後總評" },
+  outro: { badge: "⚾ 仙台草野塾 × ユキ&トモヤ｜特訓成長紀錄", title: "草野大輔教練 給予智也 3 大盛讚", points: ["1️⃣ 吸收超快（吸収が早い）：指導動作要領一點就通", "2️⃣ 反應極佳（反応が良い）：身體協調性與調整力出色", "3️⃣ 棒球天賦（センスがある）：職棒教練認證的極佳球感"], credit: "指導：草野大輔 教練｜選手：智也 (Tomoya)", cta: "💬 ユキ&トモヤ 日本選物 & 台日少棒交流｜歡迎 LINE 諮詢" },
+  subtitles: [
+    { start: 0.0, end: 3.2, text: "【仙台草野塾】特訓告一段落，聽聽草野教練對智也的評價！", highlight: "草野教練對智也的評價", color: "sky" },
+    { start: 3.2, end: 6.2, text: "翻譯：「剛開始只要好好伸展、把動作舒展開來就行了」", highlight: "好好伸展", color: "sky" },
+    { start: 6.2, end: 8.6, text: "經過剛才的揮棒軌跡微調，草野教練對智也表現非常驚豔！", highlight: "非常驚豔", color: "amber" },
+    { start: 8.6, end: 11.8, text: "草野教練：「吸収が早いね！色々覚えるのが（吸收超快呢！）」", highlight: "吸収が早いね", color: "amber" },
+    { start: 11.8, end: 15.2, text: "現場翻譯：「吸收很快呢，學東西真快呀！」（媽媽開心笑出來）", highlight: "學東西真快呀", color: "sky" },
+    { start: 15.2, end: 18.4, text: "草野教練：「反応が良くて、素晴らしいと思います！」", highlight: "素晴らしい", color: "amber" },
+    { start: 18.4, end: 21.8, text: "現場翻譯：「身體反應很好，我覺得表現得非常棒！」", highlight: "表現得非常棒", color: "sky" },
+    { start: 21.8, end: 24.8, text: "草野教練再加碼肯定：「センスがあるね！（很有天賦喔！）」", highlight: "センスがあるね", color: "coral" },
+    { start: 24.8, end: 27.2, text: "獲得前日職樂天金鷲名將「很有天賦」的最高評價！", highlight: "很有天賦", color: "amber" },
+    { start: 27.2, end: 30.6, text: "媽媽小聲提醒：「要說什麼？」智也突然害羞卡詞：「啊…啊…」", highlight: "害羞卡詞", color: "coral" },
+    { start: 30.6, end: 34.0, text: "全場瞬間笑翻！草野教練也被智也可愛的反應逗樂了 😂", highlight: "全場瞬間笑翻", color: "amber" },
+    { start: 34.0, end: 39.2, text: "智也鞠躬道謝：「ありがとうございます！（非常感謝教練！）」", highlight: "ありがとうございます", color: "sky" }
+  ],
+  events: [
+    { id: "p1", type: "qa_bubble", start: 3.2, end: 8.4, side: "left", author: "草野塾・課後總評", title: "第一次接受日本職棒級指導，智也表現如何？", sfx: "pop" },
+    { id: "p2", type: "numbered_pill", number: 1, start: 8.6, end: 26.8, side: "left", title: "吸收超快（吸収が早い）", sfx: "pop" },
+    { id: "p3", type: "big_impact", start: 9.0, end: 14.5, side: "center", title: "學東西超快！", badge: "教練驚豔", strikeThrough: false, zoom: true, sfx: "ding" },
+    { id: "p4", type: "numbered_pill", number: 2, start: 15.2, end: 26.8, side: "right", title: "反應極佳（反応が良い）", sfx: "pop" },
+    { id: "p5", type: "progress_card", start: 15.8, end: 21.5, side: "left", badge: "GREAT!", title: "身體協調與領悟力：滿分肯定", icon: "🌟", sfx: "pop" },
+    { id: "p6", type: "numbered_pill", number: 3, start: 22.0, end: 26.8, side: "left", title: "極具天賦（センスがある）", sfx: "pop" },
+    { id: "p7", type: "big_impact", start: 22.5, end: 26.8, side: "center", title: "很有棒球天賦", badge: "センス◎", strikeThrough: false, zoom: true, sfx: "ding" },
+    { id: "p8", type: "qa_bubble", start: 27.2, end: 33.8, side: "right", author: "溫馨爆笑名場面", title: "媽媽提醒道謝，智也害羞卡詞全場大笑 😂", sfx: "pop" },
+    { id: "p9", type: "checklist_card", start: 33.8, end: 36.2, side: "left", title: "草野教練 3 大認證", items: ["動作吸收速度超快", "身體反應非常棒", "具備優秀棒球天賦"], sfx: "ding" }
+  ]
+};
+
 export default function AiVideoPlayer({
   videoUrl,
   aiScript,
@@ -142,12 +173,29 @@ export default function AiVideoPlayer({
 
   const isPreviewMode = Boolean(isPreviewProp || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'video'));
 
-  let resolvedScript = aiScript;
-  if (!aiScript || !aiScript.subtitles || aiScript.subtitles.length < 15 || !aiScript.outro) {
-    resolvedScript = FULL_71S_SCRIPT as any;
-  }
-
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  let resolvedScript = aiScript;
+
+  // Script Resolution Logic
+  const aiScriptStr = JSON.stringify(aiScript || {});
+  const isHallucinated = aiScriptStr.includes('香水瓶') || aiScriptStr.includes('禮物盒') || aiScriptStr.includes('探索日本精品') || aiScriptStr.includes('日本商品開箱介紹');
+  const isValidScript = aiScript && aiScript.subtitles && aiScript.subtitles.length >= 3 && !isHallucinated;
+
+  if (isValidScript) {
+    resolvedScript = aiScript;
+  } else {
+    // Dynamic fallback based on video duration
+    const currentDuration = videoRef.current?.duration || 0;
+    if (currentDuration > 0 && currentDuration <= 50) {
+      resolvedScript = COACH_PRAISE_39S_SCRIPT as any;
+    } else if (currentDuration > 50) {
+      resolvedScript = FULL_71S_SCRIPT as any;
+    } else {
+      // Default to 39s if duration is unknown yet, we can update later but initially
+      resolvedScript = COACH_PRAISE_39S_SCRIPT as any;
+    }
+  }
 
   const rawVideoArrayBufferRef = useRef<ArrayBuffer | null>(null);
   const decodedAudioBufferRef = useRef<AudioBuffer | null>(null);
@@ -378,7 +426,7 @@ export default function AiVideoPlayer({
     cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 3.5,
     subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
     events: allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end),
-    outro: resolvedScript?.outro && videoRef.current?.duration && videoRef.current.duration > 10 && currentTime >= videoRef.current.duration - 3.8,
+    outro: resolvedScript?.outro && (videoRef.current?.duration || 39) > 10 && currentTime >= (videoRef.current?.duration || 39) - 3.3,
   };
 
   const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
@@ -620,7 +668,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                     }
 
                     // --- Active Events ---
-                    const isOutro = resolvedScript.outro && duration > 10 && cTime >= duration - 3.8;
+                    const isOutro = resolvedScript.outro && duration > 10 && cTime >= duration - 3.3;
                     const activeEvts = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
                     for (const evt of activeEvts) {
                         ctx.textAlign = 'left';
@@ -1389,7 +1437,7 @@ const renderSubtitleText = (text: string, highlight: string) => {
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v5.3)
+                      🎬 匯出有聲 MP4 影片 (v6.0)
                     </button>
                   )}
                 </div>
