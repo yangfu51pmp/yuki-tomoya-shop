@@ -133,7 +133,7 @@ export default function AiVideoPlayer({
   // Local toggle for effect without changing redis
   const [effectEnabled, setEffectEnabled] = useState(resolvedScript?.enabled !== false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [cutEnabled, setCutEnabled] = useState(false);
+  const [jumpCutEnabled, setJumpCutEnabled] = useState(false);
   const [currentSpeechZoom, setCurrentSpeechZoom] = useState<number>(1);
 
   const [isExporting, setIsExporting] = useState(false);
@@ -144,6 +144,9 @@ export default function AiVideoPlayer({
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
   const playedSfxRef = useRef<Set<string>>(new Set());
+  const lastUpdateRef = useRef<number>(0);
+  const lastSeekRef = useRef<number>(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const unlockAudio = useCallback(() => {
     if (videoRef.current) {
@@ -265,7 +268,12 @@ export default function AiVideoPlayer({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       const cTime = videoRef.current.currentTime;
-      setCurrentTime(cTime);
+      const now = Date.now();
+
+      if (now - lastUpdateRef.current > 120) {
+        setCurrentTime(cTime);
+        lastUpdateRef.current = now;
+      }
 
       // Reset sounds if video loops or restarts
       if (cTime < 0.5) {
@@ -273,7 +281,7 @@ export default function AiVideoPlayer({
       }
 
       // AI Gap Cutting & Auto Zoom
-      if (cutEnabled && resolvedScript?.speechSegments && resolvedScript.speechSegments.length > 0) {
+      if (jumpCutEnabled && resolvedScript?.speechSegments && resolvedScript.speechSegments.length > 0) {
         const segments = resolvedScript.speechSegments;
         let inSegment = false;
         for (let i = 0; i < segments.length; i++) {
@@ -285,10 +293,11 @@ export default function AiVideoPlayer({
           }
         }
 
-        if (!inSegment) {
+        if (!inSegment && now - lastSeekRef.current > 800) {
           const nextSeg = segments.find(s => s.start > cTime);
           if (nextSeg) {
             videoRef.current.currentTime = nextSeg.start;
+            lastSeekRef.current = now;
           }
         }
       } else {
@@ -330,7 +339,7 @@ export default function AiVideoPlayer({
   }
 
   const activeEffects = {
-    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 2.5,
+    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= 2.4,
     subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
     events: allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end),
   };
@@ -340,7 +349,7 @@ export default function AiVideoPlayer({
 
   let scaleClass = "scale-100";
   if (isZoomed) scaleClass = "scale-[1.08]";
-  else if (cutEnabled && currentSpeechZoom === 1.07) scaleClass = "scale-[1.07]";
+  else if (jumpCutEnabled && currentSpeechZoom === 1.07) scaleClass = "scale-[1.07]";
 
   const videoClass = `w-full h-full object-cover transition-transform duration-500 ease-out ${
     scaleClass
@@ -350,7 +359,13 @@ export default function AiVideoPlayer({
     ? "max-w-[360px] w-full mx-auto aspect-[9/16] relative bg-black rounded-2xl shadow-xl overflow-hidden border-4 border-white ring-1 ring-[#bbe3f8]/40"
     : "w-full max-w-4xl mx-auto aspect-video relative bg-black rounded-2xl shadow-xl overflow-hidden border-4 border-white ring-1 ring-[#bbe3f8]/40";
 
-  const renderSubtitleText = (text: string, highlight: string) => {
+
+  const formatTime = (time: number) => {
+    const m = Math.floor(time / 60);
+    const s = Math.floor(time % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+const renderSubtitleText = (text: string, highlight: string) => {
     if (!highlight) return text;
     const parts = text.split(highlight);
     return (
@@ -368,6 +383,18 @@ export default function AiVideoPlayer({
   };
 
   // ================= 匯出影片功能 =================
+
+  const drawRoundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+  };
+
   const exportVideo = useCallback(async () => {
     if (!videoRef.current || !containerRef.current) return;
 
@@ -375,53 +402,24 @@ export default function AiVideoPlayer({
     setExportProgress(0);
 
     try {
-        // Stop current playback
-        videoRef.current.pause();
-        const duration = videoRef.current.duration;
-        videoRef.current.currentTime = 0;
+        const v = videoRef.current;
+        v.pause();
+        const duration = v.duration;
 
-        // 確保有 duration
         if (!duration || !isFinite(duration)) {
             throw new Error("Cannot determine video duration");
         }
 
-        // Setup Canvas
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Could not get 2d context");
 
-        const vw = videoRef.current.videoWidth;
-        const vh = videoRef.current.videoHeight;
-
-        // Set canvas to video intrinsic size
+        const vw = v.videoWidth;
+        const vh = v.videoHeight;
         canvas.width = Math.floor(vw / 2) * 2;
         canvas.height = Math.floor(vh / 2) * 2;
 
-        // 建立離線錄製器
-        const canvasStream = canvas.captureStream(30); // 30 fps
-
-        // Setup Audio for Export
-        let audioCtxForExport = audioContextRef.current;
-        if (!audioCtxForExport) {
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-            if (AudioContextClass) {
-                audioCtxForExport = new AudioContextClass();
-                audioContextRef.current = audioCtxForExport;
-            }
-        }
-        if (audioCtxForExport) {
-            exportDestRef.current = audioCtxForExport.createMediaStreamDestination();
-        }
-
-        const videoStream = (videoRef.current as any).captureStream?.() || (videoRef.current as any).mozCaptureStream?.();
-        const videoAudioTracks = videoStream ? videoStream.getAudioTracks() : [];
-        const sfxAudioTracks = exportDestRef.current ? exportDestRef.current.stream.getAudioTracks() : [];
-
-        const combinedStream = new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            ...videoAudioTracks,
-            ...sfxAudioTracks
-        ]);
+        const canvasStream = canvas.captureStream(30);
 
         let options: MediaRecorderOptions = { mimeType: 'video/mp4;codecs=avc1' };
         if (!MediaRecorder.isTypeSupported(options.mimeType!)) {
@@ -430,186 +428,150 @@ export default function AiVideoPlayer({
                 options = { mimeType: 'video/webm;codecs=vp8,opus' };
             }
         }
-
-        // Ensure MediaRecorder is supported
         if (!options.mimeType || !MediaRecorder.isTypeSupported(options.mimeType)) {
-             console.warn(`${options.mimeType} is not supported, using default.`);
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
              delete (options as any).mimeType;
         }
 
-        const mediaRecorder = new MediaRecorder(combinedStream, options);
+        const mediaRecorder = new MediaRecorder(canvasStream, options);
         const chunks: BlobPart[] = [];
 
         mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) {
-                chunks.push(e.data);
-            }
+            if (e.data.size > 0) chunks.push(e.data);
         };
 
         const recordingPromise = new Promise<Blob>((resolve) => {
-            mediaRecorder.onstop = () => {
-                resolve(new Blob(chunks, { type: options.mimeType || 'video/mp4' }));
-            };
+            mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: options.mimeType || 'video/mp4' }));
         });
 
-        mediaRecorder.start();
+        // Fast forward export wait for 0
+        v.currentTime = 0;
+        await new Promise<void>((r) => {
+            const onSeeked = () => { v.removeEventListener('seeked', onSeeked); r(); };
+            v.addEventListener('seeked', onSeeked);
+            if (v.currentTime === 0) r();
+        });
+        await new Promise(r => setTimeout(r, 150));
 
-        // Simulate playback loop for rendering
-        const fps = 30;
-        const step = 1 / fps;
-        const totalFrames = Math.ceil(duration * fps);
+        v.muted = true;
+        await v.play();
+        mediaRecorder.start(200);
 
-        // Prepare styles for canvas drawing based on current container size
         const containerRect = containerRef.current.getBoundingClientRect();
         const scaleX = vw / containerRect.width;
         const scaleY = vh / containerRect.height;
 
-        // Wait for video to seek
-        await new Promise((r) => {
-             const onSeeked = () => {
-                 videoRef.current?.removeEventListener('seeked', onSeeked);
-                 r(true);
-             };
-             videoRef.current?.addEventListener('seeked', onSeeked);
-             // Ensure it triggers if it's already at 0
-             if(videoRef.current?.currentTime === 0) r(true);
-        });
+        let animationFrameId: number;
+        const drawFrame = async () => {
+            if (v.ended || v.currentTime >= duration - 0.15) {
+                mediaRecorder.stop();
+                return;
+            }
 
-        // Render loop
-        for (let frame = 0; frame <= totalFrames; frame++) {
-            const time = frame * step;
-            if (time > duration) break;
-
-            videoRef.current.currentTime = time;
-
-            await new Promise((r) => {
-                const onSeeked = () => {
-                    videoRef.current?.removeEventListener('seeked', onSeeked);
-                    r(true);
-                };
-                videoRef.current?.addEventListener('seeked', onSeeked);
-            });
-
-            setExportProgress(Math.floor((frame / totalFrames) * 100));
-
-            // Draw video frame
+            setExportProgress(Math.floor((v.currentTime / duration) * 100));
             ctx.clearRect(0, 0, vw, vh);
 
-            // Handle Zoom if enabled
-            if (effectEnabled && resolvedScript) {
-                 const cTime = videoRef.current.currentTime;
-                 const activeChecklist = resolvedScript.checklistCard && cTime >= resolvedScript.checklistCard.start && cTime <= resolvedScript.checklistCard.end;
-                 const activeBigK = resolvedScript.bigKeywords?.find((k) => cTime >= k.start && cTime <= k.end);
-                 const isZoom = activeChecklist || activeBigK;
+            try {
+                // Handle Zoom
+                let isZoom = false;
+                if (effectEnabled && resolvedScript) {
+                    const cTime = v.currentTime;
+                    const activeChecklist = resolvedScript.checklistCard && cTime >= resolvedScript.checklistCard.start && cTime <= resolvedScript.checklistCard.end;
+                    const activeBigK = resolvedScript.bigKeywords?.find((k) => cTime >= k.start && cTime <= k.end);
+                    isZoom = !!(activeChecklist || activeBigK);
+                }
 
-                 if (isZoom) {
-                     ctx.save();
-                     ctx.translate(vw / 2, vh / 2);
-                     ctx.scale(1.05, 1.05);
-                     ctx.translate(-vw / 2, -vh / 2);
-                     ctx.drawImage(videoRef.current, 0, 0, vw, vh);
-                     ctx.restore();
-                 } else {
-                     ctx.drawImage(videoRef.current, 0, 0, vw, vh);
-                 }
-            } else {
-                ctx.drawImage(videoRef.current, 0, 0, vw, vh);
+                if (isZoom) {
+                    ctx.save();
+                    ctx.translate(vw / 2, vh / 2);
+                    ctx.scale(1.05, 1.05);
+                    ctx.translate(-vw / 2, -vh / 2);
+                    ctx.drawImage(v, 0, 0, vw, vh);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(v, 0, 0, vw, vh);
+                }
+
+                if (effectEnabled && resolvedScript) {
+                    const cTime = v.currentTime;
+
+                    // --- 常駐標籤 ---
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+                    drawRoundedRect(ctx, 20 * scaleX, 20 * scaleY, 140 * scaleX, 28 * scaleY, 14 * Math.min(scaleX, scaleY));
+                    ctx.fillStyle = "#6d6d6d";
+                    ctx.font = `bold ${12 * scaleY}px sans-serif`;
+                    ctx.fillText("✨ ユキ&トモヤ｜日本實拍", 28 * scaleX, 39 * scaleY);
+
+                    // --- 封面 ---
+                    if (resolvedScript.cover && cTime <= 2.4) {
+                        ctx.fillStyle = "rgba(120, 196, 236, 0.9)";
+                        ctx.fillRect(0, 0, vw, 40 * scaleY);
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                        ctx.textAlign = "center";
+                        ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, vw / 2, 25 * scaleY);
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = `bold ${36 * scaleY}px sans-serif`;
+                        ctx.textAlign = "center";
+                        ctx.shadowColor = "rgba(0,0,0,0.5)";
+                        ctx.shadowBlur = 10;
+                        ctx.fillText(resolvedScript.cover.title, vw / 2, vh / 2 - 40 * scaleY);
+                    }
+
+                    // --- QA Card ---
+                    if (resolvedScript.qaCard && cTime >= resolvedScript.qaCard.start && cTime <= resolvedScript.qaCard.end) {
+                        ctx.fillStyle = "white";
+                        const cx = vw / 2;
+                        const cy = vh / 2;
+                        ctx.shadowColor = "rgba(0,0,0,0.1)";
+                        ctx.shadowBlur = 20 * scaleY;
+                        drawRoundedRect(ctx, cx - 150 * scaleX, cy - 60 * scaleY, 300 * scaleX, 120 * scaleY, 16 * Math.min(scaleX, scaleY));
+                        ctx.shadowBlur = 0;
+
+                        ctx.fillStyle = "#78C4EC";
+                        ctx.font = `bold ${14 * scaleY}px sans-serif`;
+                        ctx.textAlign = "left";
+                        ctx.fillText(`● ${resolvedScript.qaCard.author}`, cx - 130 * scaleX, cy - 30 * scaleY);
+
+                        ctx.fillStyle = "#333";
+                        ctx.font = `bold ${18 * scaleY}px sans-serif`;
+                        ctx.fillText(resolvedScript.qaCard.question, cx - 130 * scaleX, cy + 10 * scaleY);
+                    }
+
+                    // --- Subtitles ---
+                    const sub = resolvedScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
+                    if (sub) {
+                        ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
+                        const padX = 20 * scaleX;
+                        const padY = 10 * scaleY;
+                        ctx.font = `bold ${16 * scaleY}px sans-serif`;
+                        const m = ctx.measureText(sub.text);
+                        const rectW = m.width + padX * 2;
+                        const rectH = 16 * scaleY + padY * 2;
+
+                        const rx = (vw - rectW) / 2;
+                        const ry = vh - rectH - 40 * scaleY;
+
+                        drawRoundedRect(ctx, rx, ry, rectW, rectH, rectH / 2);
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(sub.text, vw / 2, ry + rectH / 2);
+                    }
+                }
+            } catch (err) {
+                console.error("Canvas draw error during export:", err);
             }
 
-            // ==========================================
-            // Draw UI Overlays (Simplified Canvas Render)
-            // ==========================================
-            if (effectEnabled && resolvedScript) {
-                const cTime = time;
+            animationFrameId = requestAnimationFrame(drawFrame);
+        };
+        drawFrame();
 
-                // --- 常駐標籤 ---
-                ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-                ctx.beginPath();
-                ctx.roundRect(20 * scaleX, 20 * scaleY, 140 * scaleX, 28 * scaleY, 14 * Math.min(scaleX, scaleY));
-                ctx.fill();
-                ctx.fillStyle = "#6d6d6d";
-                ctx.font = `bold ${12 * scaleY}px sans-serif`;
-                ctx.fillText("✨ ユキ&トモヤ｜日本實拍", 28 * scaleX, 39 * scaleY);
-
-                // --- 封面 ---
-                if (resolvedScript.cover && cTime <= 2.5) {
-                    ctx.fillStyle = "rgba(120, 196, 236, 0.9)";
-                    ctx.fillRect(0, 0, vw, 40 * scaleY);
-
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                    ctx.textAlign = "center";
-                    ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, vw / 2, 25 * scaleY);
-
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = `bold ${36 * scaleY}px sans-serif`;
-                    ctx.textAlign = "center";
-                    ctx.shadowColor = "rgba(0,0,0,0.5)";
-                    ctx.shadowBlur = 10;
-                    ctx.fillText(resolvedScript.cover.title, vw / 2, vh / 2 - 40 * scaleY);
-                    ctx.shadowBlur = 0;
-
-                    ctx.font = `normal ${18 * scaleY}px sans-serif`;
-                    ctx.fillText(resolvedScript.cover.subtitle, vw / 2, vh / 2);
-                }
-
-                // --- QA Card ---
-                if (resolvedScript.qaCard && cTime >= resolvedScript.qaCard.start && cTime <= resolvedScript.qaCard.end) {
-                    ctx.fillStyle = "white";
-                    const cx = vw / 2;
-                    const cy = vh / 2;
-                    ctx.shadowColor = "rgba(0,0,0,0.1)";
-                    ctx.shadowBlur = 20 * scaleY;
-                    ctx.beginPath();
-                    ctx.roundRect(cx - 150 * scaleX, cy - 60 * scaleY, 300 * scaleX, 120 * scaleY, 16 * Math.min(scaleX, scaleY));
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-
-                    ctx.fillStyle = "#78C4EC";
-                    ctx.font = `bold ${14 * scaleY}px sans-serif`;
-                    ctx.textAlign = "left";
-                    ctx.fillText(`● ${resolvedScript.qaCard.author}`, cx - 130 * scaleX, cy - 30 * scaleY);
-
-                    ctx.fillStyle = "#333";
-                    ctx.font = `bold ${18 * scaleY}px sans-serif`;
-                    ctx.fillText(resolvedScript.qaCard.question, cx - 130 * scaleX, cy + 10 * scaleY);
-                }
-
-                // --- Subtitles ---
-                const sub = resolvedScript.subtitles?.find((s) => cTime >= s.start && cTime <= s.end);
-                if (sub) {
-                    ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
-                    const padX = 20 * scaleX;
-                    const padY = 10 * scaleY;
-                    ctx.font = `bold ${16 * scaleY}px sans-serif`;
-                    const m = ctx.measureText(sub.text);
-                    const rectW = m.width + padX * 2;
-                    const rectH = 16 * scaleY + padY * 2;
-
-                    const rx = (vw - rectW) / 2;
-                    const ry = vh - rectH - 40 * scaleY;
-
-                    ctx.beginPath();
-                    ctx.roundRect(rx, ry, rectW, rectH, rectH / 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = "#ffffff";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    // Simplification: Not rendering highlight color in canvas export to save complex math
-                    ctx.fillText(sub.text, vw / 2, ry + rectH / 2);
-                }
-            }
-
-            // Slight delay to allow canvas render
-            await new Promise((r) => setTimeout(r, 10));
-        }
-
-        mediaRecorder.stop();
         const blob = await recordingPromise;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
-        // Download
         const file = new File([blob], 'yuki-tomoya-video.mp4', { type: 'video/mp4' });
         const objUrl = URL.createObjectURL(file);
         setExportedFile(file);
@@ -620,12 +582,11 @@ export default function AiVideoPlayer({
         alert("影片匯出失敗");
     } finally {
         setIsExporting(false);
-        exportDestRef.current = null;
         setExportProgress(0);
-        // resume normal playback
         if (videoRef.current) {
+            videoRef.current.muted = false;
             videoRef.current.currentTime = 0;
-            videoRef.current.play();
+            videoRef.current.play().catch(()=>{});
         }
     }
   }, [resolvedScript, effectEnabled]);
@@ -656,32 +617,94 @@ export default function AiVideoPlayer({
           playsInline
           controls={false}
           onTimeUpdate={handleTimeUpdate}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           onLoadedMetadata={handleLoadedMetadata}
           className={videoClass}
         />
+
+        {/* Playback Overlays */}
+        {!isPlaying && !isExporting && (
+          <div className="absolute inset-0 z-40 pointer-events-auto flex items-center justify-center bg-black/40"
+               onClick={() => {
+                 const v = videoRef.current;
+                 if (v) {
+                   v.muted = false;
+                   v.volume = 1.0;
+                   if (v.paused) {
+                     v.play().catch(() => { v.muted = true; v.play(); });
+                   } else {
+                     v.pause();
+                   }
+                 }
+               }}
+          >
+            <div className="bg-[#78C4EC] text-white px-6 py-3 rounded-full font-extrabold shadow-2xl flex items-center gap-2 hover:bg-[#6db3e0] transition transform hover:scale-105 cursor-pointer text-lg">
+              ▶ 點擊播放影片（含聲音＋AI特效）
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Playback Bar */}
+        {!isExporting && (
+          <div className="absolute bottom-0 left-0 right-0 z-40 pointer-events-auto bg-gradient-to-t from-black/80 to-transparent p-4 flex items-center justify-between transition-opacity duration-300 opacity-0 hover:opacity-100">
+             <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const v = videoRef.current;
+                  if (v) {
+                    if (v.paused) v.play().catch(() => { v.muted = true; v.play(); });
+                    else v.pause();
+                  }
+                }}
+                className="text-white hover:text-[#78C4EC] transition"
+             >
+                {isPlaying ? '⏸ 暫停' : '▶ 播放'}
+             </button>
+             <div className="text-white/90 text-sm font-bold tracking-wider">
+                {formatTime(currentTime)} / {videoRef.current?.duration ? formatTime(videoRef.current.duration) : '0:00'}
+             </div>
+             <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const v = videoRef.current;
+                  if (v) {
+                    v.muted = !v.muted;
+                    setIsVideoMuted(v.muted);
+                  }
+                }}
+                className="text-white hover:text-[#78C4EC] transition"
+             >
+                {isVideoMuted ? '🔇 靜音' : '🔊 聲音開'}
+             </button>
+          </div>
+        )}
+
 
         {/* AI 特效圖層 */}
         {effectEnabled && resolvedScript && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden font-sans">
 
             {/* 常駐左上角標籤 */}
-            <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 bg-white/85 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-white/50">
-              <span className="text-[10px] sm:text-xs font-bold text-[#6d6d6d]">✨ ユキ&トモヤ｜日本實拍</span>
-            </div>
+            {!activeEffects.cover && (
+              <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 bg-white/85 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-white/50">
+                <span className="text-[10px] sm:text-xs font-bold text-[#6d6d6d]">✨ ユキ&トモヤ｜日本實拍</span>
+              </div>
+            )}
 
             {/* 1. 雜誌風封面 (0:00 ~ 0:02.5) */}
             {activeEffects.cover && (
               <div className="absolute inset-0 z-20 flex flex-col bg-gradient-to-b from-black/30 via-transparent to-black/40 animate-in fade-in duration-500">
-                <div className="w-full bg-[#78C4EC]/95 text-white text-center py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
+                <div className="w-full bg-[#78C4EC]/95 text-white text-center py-1 px-3 text-xs font-bold tracking-widest uppercase">
                   {resolvedScript.cover?.issue}
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-start pt-12 sm:pt-20 px-6">
-                  <h1 className="text-white text-3xl sm:text-4xl md:text-5xl font-extrabold text-center leading-tight drop-shadow-lg scale-in-center tracking-wide">
+                  <h1 className="text-white text-2xl sm:text-3xl font-black text-center leading-tight drop-shadow-lg scale-in-center tracking-wide">
                     {resolvedScript.cover?.title}
                   </h1>
                   {resolvedScript.cover?.subtitle && (
-                    <p className="mt-3 text-white/90 text-sm sm:text-base font-medium tracking-widest drop-shadow-md">
+                    <p className="mt-3 text-white/90 text-xs font-medium tracking-widest drop-shadow-md">
                       {resolvedScript.cover.subtitle}
                     </p>
                   )}
@@ -689,8 +712,8 @@ export default function AiVideoPlayer({
 
                 {/* 裝飾印章 */}
                 {resolvedScript.cover?.stamp && (
-                  <div className="absolute top-24 left-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-[#78C4EC] bg-[#78C4EC]/10 backdrop-blur flex items-center justify-center rotate-[-15deg]">
-                     <span className="text-[#78C4EC] font-bold text-[10px] sm:text-xs text-center leading-tight">
+                  <div className="absolute top-8 right-4 w-12 h-12 rounded-full border-2 border-[#78C4EC] bg-[#78C4EC]/10 backdrop-blur flex items-center justify-center rotate-[-15deg]">
+                     <span className="text-[#78C4EC] font-bold text-xs text-center leading-tight">
                         {resolvedScript.cover.stamp.split("").join("\n")}
                      </span>
                   </div>
@@ -706,10 +729,10 @@ export default function AiVideoPlayer({
                   <span className="text-white text-[8px] mt-1 tracking-widest">YUKI & TOMOYA</span>
                 </div>
 
-                <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end">
-                  <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-xl px-4 py-2">
-                    <p className="text-white/80 text-[10px] sm:text-xs mb-0.5">{resolvedScript.cover?.speakerTitle}</p>
-                    <p className="text-white font-bold text-sm sm:text-base">｜{resolvedScript.cover?.speakerName}</p>
+                <div className="absolute bottom-10 left-3 flex justify-between items-end">
+                  <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-xl px-2.5 py-1">
+                    <p className="text-white/80 text-[10px] mb-0.5">{resolvedScript.cover?.speakerTitle}</p>
+                    <p className="text-white font-bold text-xs">｜{resolvedScript.cover?.speakerName}</p>
                   </div>
                 </div>
               </div>
@@ -899,16 +922,16 @@ export default function AiVideoPlayer({
                   </button>
 
                   <button
-                    onClick={() => { unlockAudio(); setCutEnabled(!cutEnabled); }}
+                    onClick={() => { unlockAudio(); setJumpCutEnabled(!jumpCutEnabled); }}
                     disabled={(!resolvedScript) || isExporting}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
                       (!resolvedScript) ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-                      cutEnabled
+                      jumpCutEnabled
                         ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
                         : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
                     }`}
                   >
-                    {cutEnabled ? "✂️ 氣口剪輯：開" : "✂️ 氣口剪輯：關"}
+                    {jumpCutEnabled ? "✂️ 氣口剪輯：開" : "✂️ 氣口剪輯：關"}
                   </button>
 
                   <button
@@ -924,7 +947,7 @@ export default function AiVideoPlayer({
                     className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                   >
                     <Download className="w-4 h-4" />
-                    🎬 匯出 MP4 影片 (v3.0)
+                    🎬 匯出 MP4 影片 (v4.0)
                   </button>
                 </div>
 
