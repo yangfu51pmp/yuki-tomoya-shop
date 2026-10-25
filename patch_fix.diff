@@ -1,0 +1,34 @@
+--- src/components/AiVideoPlayer.tsx
++++ src/components/AiVideoPlayer.tsx
+@@ -449,15 +449,17 @@
+         const selectedMime = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+
+         try {
+             mediaRecorder = selectedMime
+                 ? new MediaRecorder(canvasStream, { mimeType: selectedMime })
+                 : new MediaRecorder(canvasStream);
++            mediaRecorder.start(200);
+         } catch (err1) {
+             mediaRecorder = new MediaRecorder(canvasStream);
++            mediaRecorder.start(200);
+         }
+
+         mediaRecorder.ondataavailable = (e) => {
+             if (e.data.size > 0) chunks.push(e.data);
+         };
+
+         const recordingPromise = new Promise<Blob>((resolve) => {
+@@ -475,13 +477,6 @@
+         await new Promise(r => setTimeout(r, 150));
+
+         v.muted = true;
+         await v.play();
+-
+-        try {
+-            mediaRecorder.start(200);
+-        } catch (err1) {
+-            mediaRecorder = new MediaRecorder(canvasStream);
+-            mediaRecorder.start(200);
+-        }
+
+         const containerRect = containerRef.current.getBoundingClientRect();
