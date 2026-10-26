@@ -11,6 +11,12 @@ import {
 } from "lucide-react";
 
 interface AiScript {
+  showCover?: boolean;
+  showOutro?: boolean;
+  showBadge?: boolean;
+  showCards?: boolean;
+  showSubtitles?: boolean;
+  audioConfig?: { clipMuted?: boolean[] };
   enabled?: boolean;
   cover?: {
     issue: string;
@@ -129,6 +135,21 @@ const FULL_71S_SCRIPT = {
 };
 
 
+const BRAND_30S_STITCHED_SCRIPT = {
+  showCover: false,
+  showOutro: false,
+  showCards: false,
+  showSubtitles: true,
+  audioConfig: { clipMuted: [false, true, false] },
+  subtitles: [
+    { start: 0.8, end: 5.0, text: "YUKI & TOMOYA 日本仙台職人生活選物", highlight: "YUKI & TOMOYA", color: "sky" },
+    { start: 5.0, end: 10.0, text: "為您精選獨具匠心的日本好物", highlight: "精選獨具匠心", color: "amber" },
+    { start: 10.0, end: 15.0, text: "質感生活，從這裡開始", highlight: "質感生活", color: "sky" },
+    { start: 15.0, end: 20.0, text: "探索更多精選商品，體驗日本職人精神", highlight: "日本職人精神", color: "amber" },
+    { start: 20.0, end: 25.0, text: "歡迎來到 YUKI & TOMOYA 的世界", highlight: "YUKI & TOMOYA", color: "sky" }
+  ]
+};
+
 const COACH_PRAISE_39S_SCRIPT = {
   cover: { issue: "ISSUE 08｜日本仙台・草野塾特訓花絮", title: "前日職名將的高度肯定！", subtitle: "草野大輔教練 盛讚智也學習力與打擊天賦", stamp: "教練盛讚", speakerName: "草野大輔 教練 × 智也", speakerTitle: "日本仙台草野塾 課後總評" },
   outro: { badge: "⚾ 仙台草野塾 × ユキ&トモヤ｜特訓成長紀錄", title: "草野大輔教練 給予智也 3 大盛讚", points: ["1️⃣ 吸收超快（吸収が早い）：指導動作要領一點就通", "2️⃣ 反應極佳（反応が良い）：身體協調性與調整力出色", "3️⃣ 棒球天賦（センスがある）：職棒教練認證的極佳球感"], credit: "指導：草野大輔 教練｜選手：智也 (Tomoya)", cta: "💬 ユキ&トモヤ 日本選物 & 台日少棒交流｜歡迎 LINE 諮詢" },
@@ -164,14 +185,21 @@ export default function AiVideoPlayer({
   aiScript,
   poster,
   isPreviewProp,
+  videoUrls
 }: {
   videoUrl: string;
   aiScript: AiScript | null;
   poster?: string;
   isPreviewProp?: boolean;
+  videoUrls?: string[];
 }) {
 
   const isPreviewMode = Boolean(isPreviewProp || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'video'));
+
+  const clips = (videoUrls && videoUrls.length > 0) ? videoUrls : (videoUrl ? [videoUrl] : []);
+  const [currentClipIndex, setCurrentClipIndex] = useState(0);
+  const [clipDurations, setClipDurations] = useState<number[]>([]);
+  const [globalTime, setGlobalTime] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -181,6 +209,7 @@ export default function AiVideoPlayer({
   const aiScriptStr = JSON.stringify(aiScript || {});
   const isHallucinated = aiScriptStr.includes('香水瓶') || aiScriptStr.includes('禮物盒') || aiScriptStr.includes('探索日本精品') || aiScriptStr.includes('日本商品開箱介紹');
   const isValidScript = aiScript && aiScript.subtitles && aiScript.subtitles.length >= 3 && !isHallucinated;
+  const isMultiClip = clips.length >= 2;
 
   if (isValidScript) {
     resolvedScript = aiScript;
@@ -188,7 +217,7 @@ export default function AiVideoPlayer({
     // Dynamic fallback based on video duration
     const currentDuration = videoRef.current?.duration || 0;
     if (currentDuration > 0 && currentDuration <= 50) {
-      resolvedScript = COACH_PRAISE_39S_SCRIPT as any;
+      resolvedScript = (isMultiClip ? BRAND_30S_STITCHED_SCRIPT : COACH_PRAISE_39S_SCRIPT) as any;
     } else if (currentDuration > 50) {
       resolvedScript = FULL_71S_SCRIPT as any;
     } else {
@@ -197,16 +226,18 @@ export default function AiVideoPlayer({
     }
   }
 
-  const rawVideoArrayBufferRef = useRef<ArrayBuffer | null>(null);
-  const decodedAudioBufferRef = useRef<AudioBuffer | null>(null);
+  const rawVideoArrayBufferRefs = useRef<(ArrayBuffer | null)[]>([]);
+  const decodedAudioBufferRefs = useRef<(AudioBuffer | null)[]>([]);
 
   useEffect(() => {
-    if (!videoUrl) return;
-    fetch(videoUrl)
-      .then(res => res.arrayBuffer())
-      .then(buf => { rawVideoArrayBufferRef.current = buf; })
-      .catch(() => {});
-  }, [videoUrl]);
+    rawVideoArrayBufferRefs.current = new Array(clips.length).fill(null);
+    clips.forEach((url, i) => {
+      fetch(url)
+        .then(res => res.arrayBuffer())
+        .then(buf => { rawVideoArrayBufferRefs.current[i] = buf; })
+        .catch(() => {});
+    });
+  }, [clips]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -218,6 +249,8 @@ export default function AiVideoPlayer({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [jumpCutEnabled, setJumpCutEnabled] = useState(false);
   const [currentSpeechZoom, setCurrentSpeechZoom] = useState<number>(1);
+  const [cardsVisible, setCardsVisible] = useState(resolvedScript?.showCards !== false);
+  const [subtitlesVisible, setSubtitlesVisible] = useState(resolvedScript?.showSubtitles !== false);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -356,6 +389,759 @@ export default function AiVideoPlayer({
 
       if (now - lastUpdateRef.current > 120) {
         setCurrentTime(cTime);
+    const pastDuration = clipDurations.slice(0, currentClipIndex).reduce((a, b) => a + b, 0);
+    setGlobalTime(pastDuration + cTime);
+        lastUpdateRef.current = now;
+      }
+
+      // Reset sounds if video loops or restarts
+      if (cTime < 0.5) {
+        playedSfxRef.current.clear();
+      }
+
+      // AI Gap Cutting & Auto Zoom
+      if (jumpCutEnabled && resolvedScript?.speechSegments && resolvedScript.speechSegments.length > 0) {
+        const segments = resolvedScript.speechSegments;
+        let inSegment = false;
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          if (cTime >= seg.start && cTime <= seg.end) {
+            inSegment = true;
+            setCurrentSpeechZoom(seg.zoomLevel);
+            break;
+          }
+        }
+
+        if (!inSegment && now - lastSeekRef.current > 800) {
+          const nextSeg = segments.find(s => s.start > cTime);
+          if (nextSeg) {
+            videoRef.current.currentTime = nextSeg.start;
+            lastSeekRef.current = now;
+          }
+        }
+      } else {
+        setCurrentSpeechZoom(1);
+      }
+
+      if (effectEnabled && resolvedScript) {
+        const events = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
+        events.forEach(evt => {
+          if (evt.sfx && !playedSfxRef.current.has(evt.id)) {
+            playedSfxRef.current.add(evt.id);
+            playSfx(evt.sfx as 'pop' | 'whoosh' | 'ding' | 'alert');
+          }
+        });
+      }
+    }
+  };
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const target = e.currentTarget;
+    setIsVertical(target.videoHeight > target.videoWidth);
+  };
+
+  // Backward compatibility: Convert old elements to new events
+  const allEvents = (resolvedScript?.events || []).slice();
+  if (resolvedScript && allEvents.length === 0) {
+     if (resolvedScript.qaCard) {
+         allEvents.push({ id: 'legacy_qa', type: 'qa_bubble', start: resolvedScript.qaCard.start, end: resolvedScript.qaCard.end, author: resolvedScript.qaCard.author, title: resolvedScript.qaCard.question, sfx: 'pop' });
+     }
+     if (resolvedScript.numberedPills) {
+         resolvedScript.numberedPills.forEach((p, i) => allEvents.push({ id: `legacy_pill_${i}`, type: 'numbered_pill', start: p.start, end: p.end, number: p.number, title: p.text, side: p.side, sfx: 'pop' }));
+     }
+     if (resolvedScript.bigKeywords) {
+         resolvedScript.bigKeywords.forEach((k, i) => allEvents.push({ id: `legacy_keyword_${i}`, type: 'big_impact', start: k.start, end: k.end, title: k.text, badge: k.badge, zoom: true, sfx: 'whoosh' }));
+     }
+     if (resolvedScript.checklistCard) {
+         allEvents.push({ id: 'legacy_checklist', type: 'checklist_card', start: resolvedScript.checklistCard.start, end: resolvedScript.checklistCard.end, title: resolvedScript.checklistCard.title, items: resolvedScript.checklistCard.items, sfx: 'ding' });
+     }
+  }
+
+  const coverEnd = 3.2; // 0.0 - 3.2s
+  const outroStart = (videoRef.current?.duration || 39) > 10 ? (videoRef.current?.duration || 39) - 3.5 : 999;
+
+  let rawActiveEvents = allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end);
+
+  // 1. Strict Intro / Outro Isolation
+  if (currentTime <= coverEnd + 0.2 || currentTime >= outroStart - 0.2) {
+      rawActiveEvents = [];
+  }
+
+  // 2. Automatic Anti-Overlap Layout Guard Engine
+  const cards = rawActiveEvents.filter(e => ['qa_bubble', 'myth_buster', 'progress_card', 'checklist_card', 'target_focus'].includes(e.type));
+  const activeCardsLeft = cards.filter(e => e.side === 'left');
+  const activeCardsRight = cards.filter(e => e.side === 'right');
+
+  let finalActiveEvents = [...rawActiveEvents];
+
+  // If a large card is active on a side, temporarily hide numbered_pills on that SAME side
+  if (activeCardsLeft.length > 0) {
+      finalActiveEvents = finalActiveEvents.filter(e => !(e.type === 'numbered_pill' && e.side === 'left'));
+  }
+  if (activeCardsRight.length > 0) {
+      finalActiveEvents = finalActiveEvents.filter(e => !(e.type === 'numbered_pill' && e.side === 'right'));
+  }
+
+  const activeEffects = {
+    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= coverEnd,
+    subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
+    events: finalActiveEvents,
+    outro: resolvedScript?.outro && currentTime >= outroStart,
+  };
+
+  const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
+  const isZoomed = effectEnabled && hasZoomEvent;
+
+  let scaleClass = "scale-100";
+  if (isZoomed) scaleClass = "scale-[1.08]";
+  else if (jumpCutEnabled && currentSpeechZoom === 1.07) scaleClass = "scale-[1.07]";
+
+  const videoClass = `w-full h-full object-cover transition-transform duration-500 ease-out ${
+    scaleClass
+  }`;
+
+  const containerClass = isVertical
+    ? "max-w-[360px] w-full mx-auto aspect-[9/16] relative bg-black rounded-2xl shadow-xl overflow-hidden border-4 border-white ring-1 ring-[#bbe3f8]/40"
+    : "w-full max-w-4xl mx-auto aspect-video relative bg-black rounded-2xl shadow-xl overflow-hidden border-4 border-white ring-1 ring-[#bbe3f8]/40";
+
+
+  const formatTime = (time: number) => {
+    const m = Math.floor(time / 60);
+    const s = Math.floor(time % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+const renderSubtitleText = (text: string, highlight?: string, color?: string) => {
+    if (!highlight) return text;
+    const parts = text.split(highlight);
+    return (
+      <>
+        {parts.map((part, i) => (
+          <span key={i}>
+            {part}
+            {i < parts.length - 1 && (
+              <span className="text-[#78C4EC] text-lg sm:text-xl font-extrabold mx-1">{highlight}</span>
+            )}
+          </span>
+        ))}
+      </>
+    );
+  };
+
+  // ================= 匯出影片功能 =================
+
+  const drawRoundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  const exportVideo = useCallback(async () => {
+    if (!videoRef.current || !containerRef.current) return;
+
+    setIsExporting(true);
+    setExportProgress(0);
+
+    try {
+        const v = videoRef.current;
+        v.pause();
+
+        const totalDuration = clipDurations.reduce((a, b) => a + b, 0) || v.duration || 30;
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Could not get 2d context");
+
+        const vw = v.videoWidth || 720;
+        const vh = v.videoHeight || 1280;
+        canvas.width = Math.floor(vw / 2) * 2;
+        canvas.height = Math.floor(vh / 2) * 2;
+
+        const canvasStream = canvas.captureStream(30);
+
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (!audioContextRef.current && AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+        }
+        const actx = audioContextRef.current;
+        if (!actx) throw new Error("AudioContext not supported");
+        if (actx.state === 'suspended') {
+          actx.resume();
+        }
+
+        const audioDest = actx.createMediaStreamDestination();
+        exportDestRef.current = audioDest;
+
+        const keepAliveOsc = actx.createOscillator();
+        const keepAliveGain = actx.createGain();
+        keepAliveGain.gain.value = 0.0001;
+        keepAliveOsc.connect(keepAliveGain);
+        keepAliveGain.connect(audioDest);
+        keepAliveOsc.start();
+
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioDest.stream.getAudioTracks()
+        ]);
+
+        const chunks: BlobPart[] = [];
+        let mediaRecorder: MediaRecorder;
+
+        try {
+            mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/mp4' });
+        } catch {
+            try {
+                mediaRecorder = new MediaRecorder(combinedStream);
+            } catch {
+                mediaRecorder = new MediaRecorder(canvasStream);
+            }
+        }
+
+        mediaRecorder.start(200);
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+        };
+
+        const recordingPromise = new Promise<Blob>((resolve) => {
+            mediaRecorder.onstop = () => {
+                keepAliveOsc.stop();
+                resolve(new Blob(chunks, { type: mediaRecorder.mimeType || 'video/mp4' }));
+            };
+        });
+
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const scaleX = vw / containerRect.width;
+        const scaleY = vh / containerRect.height;
+
+        let globalExportTime = 0;
+
+        for (let clipIdx = 0; clipIdx < clips.length; clipIdx++) {
+            v.src = clips[clipIdx];
+            await new Promise(r => { v.onloadedmetadata = r; });
+            const clipDuration = v.duration;
+
+            v.muted = true;
+            v.currentTime = 0;
+            await v.play();
+
+            let sourceNode: AudioBufferSourceNode | null = null;
+            const isMuted = resolvedScript?.audioConfig?.clipMuted?.[clipIdx];
+            if (!isMuted) {
+                if (!decodedAudioBufferRefs.current[clipIdx] && rawVideoArrayBufferRefs.current[clipIdx]) {
+                  decodedAudioBufferRefs.current[clipIdx] = await actx.decodeAudioData(rawVideoArrayBufferRefs.current[clipIdx].slice(0));
+                }
+
+                v.currentTime = 0;
+
+                if (decodedAudioBufferRefs.current[clipIdx]) {
+                   sourceNode = actx.createBufferSource();
+                   sourceNode.buffer = decodedAudioBufferRefs.current[clipIdx];
+                   sourceNode.connect(audioDest);
+                   sourceNode.connect(actx.destination);
+                   sourceNode.start(0, 0);
+                }
+            }
+
+            await new Promise<void>((resolveClip) => {
+                const drawFrame = async () => {
+                    if (v.ended || v.currentTime >= clipDuration - 0.15) {
+                        if (sourceNode) sourceNode.stop();
+                        resolveClip();
+                        return;
+                    }
+
+                    const currentGlobalTime = globalExportTime + v.currentTime;
+                    setExportProgress(Math.floor((currentGlobalTime / totalDuration) * 100));
+
+                    ctx.clearRect(0, 0, vw, vh);
+
+                    try {
+                        let isZoom = false;
+                        if (effectEnabled && resolvedScript) {
+                            const activeChecklist = resolvedScript.checklistCard && currentGlobalTime >= resolvedScript.checklistCard.start && currentGlobalTime <= resolvedScript.checklistCard.end;
+                            const activeBigK = resolvedScript.bigKeywords?.find((k) => currentGlobalTime >= k.start && currentGlobalTime <= k.end);
+                            isZoom = !!(activeChecklist || activeBigK);
+                        }
+
+                        if (isZoom) {
+                            ctx.save();
+                            ctx.translate(vw / 2, vh / 2);
+                            ctx.scale(1.05, 1.05);
+                            ctx.translate(-vw / 2, -vh / 2);
+                            ctx.drawImage(v, 0, 0, vw, vh);
+                            ctx.restore();
+                        } else {
+                            ctx.drawImage(v, 0, 0, vw, vh);
+                        }
+
+                        if (effectEnabled && resolvedScript) {
+                            const cTime = currentGlobalTime;
+
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            const cx = vw / 2;
+                            const cy = vh / 2;
+
+                            if (!(resolvedScript.cover && resolvedScript.showCover !== false && cTime <= 3.5)) {
+                                ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
+                                ctx.beginPath();
+                                ctx.roundRect(vw * 0.03, vh * 0.05, vw * 0.28, vh * 0.075, vh * 0.0375);
+                                ctx.fill();
+
+                                ctx.fillStyle = "#6d6d6d";
+                                ctx.textAlign = "left";
+                                ctx.textBaseline = "middle";
+                                ctx.font = `bold ${vh * 0.035}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
+                                ctx.fillText("✨ ユキ&トモヤ｜日本實拍", vw * 0.03 + vw * 0.02, vh * 0.05 + vh * 0.0375);
+                                ctx.textBaseline = "alphabetic";
+                            }
+
+                            if (resolvedScript.cover && resolvedScript.showCover !== false && cTime <= 3.5) {
+                                ctx.fillStyle = "rgba(120, 196, 236, 0.9)";
+                                ctx.fillRect(0, 0, vw, 40 * scaleY);
+                                ctx.fillStyle = "#ffffff";
+                                ctx.font = `bold ${14 * scaleY}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
+                                ctx.textAlign = "center";
+                                ctx.fillText(`ユキ&トモヤ｜${resolvedScript.cover.issue}`, cx, 20 * scaleY);
+
+                                ctx.fillStyle = "#ffffff";
+                                ctx.font = `bold ${36 * scaleY}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
+                                ctx.textAlign = "center";
+                                ctx.shadowColor = "rgba(0,0,0,0.5)";
+                                ctx.shadowBlur = 10;
+                                ctx.fillText(resolvedScript.cover.title, cx, cy - 40 * scaleY);
+                                ctx.shadowBlur = 0;
+
+                                if (resolvedScript.cover.subtitle) {
+                                    ctx.font = `bold ${16 * scaleY}px "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", sans-serif`;
+                                    ctx.fillText(resolvedScript.cover.subtitle, cx, cy + 10 * scaleY);
+                                }
+                            }
+
+                            const isOutro = resolvedScript.outro && resolvedScript.showOutro !== false && totalDuration > 10 && cTime >= totalDuration - 3.3;
+
+                            const allEventsForCards = (resolvedScript.events || resolvedScript.numberedPills || []).map((e: any) => ({...e, type: e.type || 'numbered_pill'}));
+                            const activeEvts = cardsVisible ? allEventsForCards.filter((e: any) => cTime >= e.start && cTime <= e.end) : [];
+
+                            for (const evt of activeEvts) {
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+
+                                if (evt.type === 'numbered_pill') {
+                                    const ex = evt.side === 'left' ? vw * 0.05 : vw * 0.55;
+                                    const ey = vh * 0.15 + (evt.side === 'right' ? vh * 0.05 : 0);
+                                    const pW = vw * 0.4;
+                                    const pH = vh * 0.06;
+                                    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+                                    ctx.beginPath();
+                                    ctx.roundRect(ex, ey, pW, pH, pH / 2);
+                                    ctx.fill();
+
+                                    ctx.fillStyle = "#78C4EC";
+                                    ctx.beginPath();
+                                    ctx.arc(ex + pH / 2, ey + pH / 2, pH * 0.35, 0, Math.PI * 2);
+                                    ctx.fill();
+
+                                    ctx.fillStyle = "white";
+                                    ctx.font = `bold ${pH * 0.5}px sans-serif`;
+                                    ctx.textAlign = "center";
+                                    ctx.textBaseline = "middle";
+                                    ctx.fillText((evt.number || 1).toString(), ex + pH / 2, ey + pH / 2);
+
+                                    ctx.textAlign = "left";
+                                    ctx.fillStyle = "white";
+                                    ctx.font = `bold ${pH * 0.4}px "PingFang TC", "Microsoft JhengHei"`;
+                                    ctx.fillText(evt.title || evt.text, ex + pH * 1.1, ey + pH / 2);
+                                } else if (evt.type === 'qa_bubble') {
+                                    const ex = vw * 0.05;
+                                    const ey = cy - vh * 0.1;
+                                    const pW = vw * 0.9;
+                                    const pH = vh * 0.12;
+                                    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+                                    ctx.beginPath();
+                                    ctx.roundRect(ex, ey, pW, pH, vh * 0.03);
+                                    ctx.fill();
+
+                                    ctx.fillStyle = "#78C4EC";
+                                    ctx.font = `bold ${pH * 0.25}px sans-serif`;
+                                    ctx.textAlign = "left";
+                                    ctx.textBaseline = "middle";
+                                    ctx.fillText(`🙋 ${evt.author || "Q&A"}`, ex + vw * 0.04, ey + pH * 0.3);
+
+                                    ctx.fillStyle = "white";
+                                    ctx.font = `bold ${pH * 0.35}px "PingFang TC", "Microsoft JhengHei"`;
+                                    ctx.fillText(evt.title, ex + vw * 0.04, ey + pH * 0.7);
+                                } else if (evt.type === 'big_impact') {
+                                    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+                                    ctx.textAlign = "center";
+                                    ctx.textBaseline = "middle";
+
+                                    if (evt.badge) {
+                                       const bw = vw * 0.3;
+                                       const bh = vh * 0.06;
+                                       ctx.beginPath();
+                                       ctx.roundRect(cx - bw/2, cy - vh*0.12 - bh/2, bw, bh, bh/2);
+                                       ctx.fill();
+                                       ctx.fillStyle = "#F59E0B";
+                                       ctx.font = `bold ${bh * 0.5}px sans-serif`;
+                                       ctx.fillText(evt.badge, cx, cy - vh*0.12);
+                                    }
+
+                                    ctx.fillStyle = "white";
+                                    ctx.font = `bold ${vh * 0.08}px "PingFang TC", "Microsoft JhengHei"`;
+                                    ctx.fillText(evt.title, cx, cy);
+
+                                    if (evt.strikeThrough) {
+                                       ctx.strokeStyle = "#EF4444";
+                                       ctx.lineWidth = vh * 0.01;
+                                       ctx.beginPath();
+                                       const tw = ctx.measureText(evt.title).width;
+                                       ctx.moveTo(cx - tw/2 - 10, cy);
+                                       ctx.lineTo(cx + tw/2 + 10, cy);
+                                       ctx.stroke();
+                                    }
+                                } else if (evt.type === 'myth_buster') {
+                                    const ex = vw * 0.05;
+                                    const ey = cy + vh * 0.05;
+                                    const pW = vw * 0.9;
+                                    const pH = vh * 0.12;
+                                    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+                                    ctx.beginPath();
+                                    ctx.roundRect(ex, ey, pW, pH, vh * 0.03);
+                                    ctx.fill();
+
+                                    ctx.fillStyle = "#EF4444";
+                                    ctx.font = `bold ${pH * 0.25}px sans-serif`;
+                                    ctx.textAlign = "left";
+                                    ctx.textBaseline = "middle";
+                                    ctx.fillText(`❌ ${evt.badge || "迷思"}`, ex + vw * 0.04, ey + pH * 0.3);
+
+                                    ctx.fillStyle = "white";
+                                    ctx.font = `bold ${pH * 0.35}px "PingFang TC", "Microsoft JhengHei"`;
+                                    ctx.fillText(evt.title, ex + vw * 0.04, ey + pH * 0.7);
+                                } else if (evt.type === 'checklist_card') {
+                                    const ex = vw * 0.05;
+                                    const ey = cy - vh * 0.15;
+                                    const pW = vw * 0.9;
+                                    const pH = vh * 0.3;
+                                    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+                                    ctx.beginPath();
+                                    ctx.roundRect(ex, ey, pW, pH, vh * 0.03);
+                                    ctx.fill();
+
+                                    ctx.fillStyle = "#78C4EC";
+                                    ctx.font = `bold ${vh * 0.035}px sans-serif`;
+                                    ctx.textAlign = "left";
+                                    ctx.textBaseline = "middle";
+                                    ctx.fillText(`✅ ${evt.title}`, ex + vw * 0.05, ey + vh * 0.05);
+
+                                    ctx.fillStyle = "white";
+                                    ctx.font = `bold ${vh * 0.03}px "PingFang TC", "Microsoft JhengHei"`;
+                                    (evt.items || []).forEach((item: any, i: number) => {
+                                        ctx.fillText(`• ${item}`, ex + vw * 0.05, ey + vh * 0.12 + (i * vh * 0.05));
+                                    });
+                                }
+                            }
+
+                            if (isOutro) {
+                                ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+                                ctx.beginPath();
+                                ctx.roundRect(vw * 0.05, cy - vh * 0.2, vw * 0.9, vh * 0.4, vh * 0.03);
+                                ctx.fill();
+
+                                ctx.textAlign = "center";
+                                ctx.textBaseline = "middle";
+
+                                ctx.fillStyle = "#78C4EC";
+                                ctx.font = `bold ${vh * 0.02}px sans-serif`;
+                                ctx.fillText(resolvedScript.outro.badge, cx, cy - vh * 0.15);
+
+                                ctx.fillStyle = "#0F172A";
+                                ctx.font = `bold ${vh * 0.04}px "PingFang TC", "Microsoft JhengHei"`;
+                                ctx.fillText(resolvedScript.outro.title, cx, cy - vh * 0.08);
+
+                                ctx.fillStyle = "#444444";
+                                ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Microsoft JhengHei"`;
+                                (resolvedScript.outro.points || []).forEach((pt: any, i: number) => {
+                                    ctx.fillText(pt, cx, cy + (i * vh * 0.04));
+                                });
+
+                                ctx.fillStyle = "#666666";
+                                ctx.font = `bold ${vh * 0.018}px sans-serif`;
+                                ctx.fillText(resolvedScript.outro.credit, cx, cy + vh * 0.15);
+                            }
+
+                            const activeSub = resolvedScript.subtitles?.find(s => cTime >= s.start && cTime <= s.end);
+                            if (activeSub && !isOutro && !(resolvedScript.cover && resolvedScript.showCover !== false && cTime <= 3.5) && subtitlesVisible) {
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                const subY = vh * 0.88;
+                                const subW = vw * 0.85;
+                                const subH = vh * 0.07;
+
+                                ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+                                ctx.beginPath();
+                                ctx.roundRect(cx - subW/2, subY - subH/2, subW, subH, subH/2);
+                                ctx.fill();
+
+                                ctx.font = `bold ${vh * 0.032}px "PingFang TC", "Microsoft JhengHei"`;
+
+                                if (activeSub.highlight) {
+                                    const parts = activeSub.text.split(activeSub.highlight);
+                                    let currentX = cx - ctx.measureText(activeSub.text).width / 2;
+
+                                    ctx.fillStyle = "white";
+                                    ctx.textAlign = 'left';
+                                    if (parts[0]) {
+                                        ctx.fillText(parts[0], currentX, subY);
+                                        currentX += ctx.measureText(parts[0]).width;
+                                    }
+
+                                    const highlightColors: any = {
+                                        sky: "#78C4EC",
+                                        amber: "#FCD34D",
+                                        coral: "#F87171"
+                                    };
+                                    ctx.fillStyle = highlightColors[activeSub.color || 'sky'] || "#78C4EC";
+                                    ctx.fillText(activeSub.highlight, currentX, subY);
+                                    currentX += ctx.measureText(activeSub.highlight).width;
+
+                                    ctx.fillStyle = "white";
+                                    if (parts[1]) {
+                                        ctx.fillText(parts[1], currentX, subY);
+                                    }
+                                } else {
+                                    ctx.fillStyle = "white";
+                                    ctx.fillText(activeSub.text, cx, subY);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Canvas draw error", err);
+                    }
+
+                    requestAnimationFrame(drawFrame);
+                };
+                requestAnimationFrame(drawFrame);
+            });
+
+            globalExportTime += clipDuration;
+        }
+
+        mediaRecorder.stop();
+        const finalBlob = await recordingPromise;
+        const fileUrl = URL.createObjectURL(finalBlob);
+        setExportedUrl(fileUrl);
+        setExportedFile(new File([finalBlob], "yuki-tomoya-video.mp4", { type: "video/mp4" }));
+
+    } catch (error) {
+        console.error("Export failed:", error);
+        alert("影片匯出失敗");
+    } finally {
+        setIsExporting(false);
+    }
+  }, [effectEnabled, resolvedScript, clips, clipDurations, cardsVisible, subtitlesVisible]);
+
+  const clips = (videoUrls && videoUrls.length > 0) ? videoUrls : (videoUrl ? [videoUrl] : []);
+  const [currentClipIndex, setCurrentClipIndex] = useState(0);
+  const [clipDurations, setClipDurations] = useState<number[]>([]);
+  const [globalTime, setGlobalTime] = useState(0);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  let resolvedScript = aiScript;
+
+  // Script Resolution Logic
+  const aiScriptStr = JSON.stringify(aiScript || {});
+  const isHallucinated = aiScriptStr.includes('香水瓶') || aiScriptStr.includes('禮物盒') || aiScriptStr.includes('探索日本精品') || aiScriptStr.includes('日本商品開箱介紹');
+  const isValidScript = aiScript && aiScript.subtitles && aiScript.subtitles.length >= 3 && !isHallucinated;
+  const isMultiClip = clips.length >= 2;
+
+  if (isValidScript) {
+    resolvedScript = aiScript;
+  } else {
+    // Dynamic fallback based on video duration
+    const currentDuration = videoRef.current?.duration || 0;
+    if (currentDuration > 0 && currentDuration <= 50) {
+      resolvedScript = (isMultiClip ? BRAND_30S_STITCHED_SCRIPT : COACH_PRAISE_39S_SCRIPT) as any;
+    } else if (currentDuration > 50) {
+      resolvedScript = FULL_71S_SCRIPT as any;
+    } else {
+      // Default to 39s if duration is unknown yet, we can update later but initially
+      resolvedScript = COACH_PRAISE_39S_SCRIPT as any;
+    }
+  }
+
+  const rawVideoArrayBufferRefs = useRef<(ArrayBuffer | null)[]>([]);
+  const decodedAudioBufferRefs = useRef<(AudioBuffer | null)[]>([]);
+
+  useEffect(() => {
+    rawVideoArrayBufferRefs.current = new Array(clips.length).fill(null);
+    clips.forEach((url, i) => {
+      fetch(url)
+        .then(res => res.arrayBuffer())
+        .then(buf => { rawVideoArrayBufferRefs.current[i] = buf; })
+        .catch(() => {});
+    });
+  }, [clips]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isVertical, setIsVertical] = useState(false);
+
+  // Local toggle for effect without changing redis
+  const [effectEnabled, setEffectEnabled] = useState(resolvedScript?.enabled !== false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [jumpCutEnabled, setJumpCutEnabled] = useState(false);
+  const [currentSpeechZoom, setCurrentSpeechZoom] = useState<number>(1);
+  const [cardsVisible, setCardsVisible] = useState(resolvedScript?.showCards !== false);
+  const [subtitlesVisible, setSubtitlesVisible] = useState(resolvedScript?.showSubtitles !== false);
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRotated, setIsRotated] = useState(false);
+  const [exportedFile, setExportedFile] = useState<File | null>(null);
+  const [exportedUrl, setExportedUrl] = useState<string | null>(null);
+
+  const playedSfxRef = useRef<Set<string>>(new Set());
+  const lastUpdateRef = useRef<number>(0);
+  const lastSeekRef = useRef<number>(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const unlockAudio = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+      setIsVideoMuted(false);
+    }
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioContextRef.current && AudioContextClass) {
+        audioContextRef.current = new AudioContextClass();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      if (ctx) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        osc.connect(gain);
+        gain.connect(exportDestRef.current || ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.001);
+      }
+    } catch (e) {
+      console.log('Audio unlock failed', e);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEffectEnabled(resolvedScript?.enabled !== false);
+  }, [resolvedScript?.enabled]);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const exportDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+
+  const playSfx = useCallback((type: 'pop' | 'whoosh' | 'ding' | 'alert') => {
+    if (!soundEnabled) return;
+    try {
+      if (!audioContextRef.current) {
+        const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
+        if (!AudioContext) return;
+        audioContextRef.current = new AudioContext();
+      }
+      const ctx = audioContextRef.current;
+
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(exportDestRef.current || ctx.destination);
+
+      if (type === 'pop') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(350, t);
+        osc.frequency.exponentialRampToValueAtTime(850, t + 0.05);
+        gain.gain.setValueAtTime(0.8, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.09);
+        osc.start(t);
+        osc.stop(t + 0.1);
+      } else if (type === 'ding') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(987, t);
+        gain.gain.setValueAtTime(0.6, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1318, t);
+        gain2.gain.setValueAtTime(0.6, t);
+        gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+        osc2.connect(gain2);
+        gain2.connect(exportDestRef.current || ctx.destination);
+
+        osc.start(t);
+        osc2.start(t);
+        osc.stop(t + 0.3);
+        osc2.stop(t + 0.3);
+      } else if (type === 'whoosh') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(50, t + 0.18);
+        gain.gain.setValueAtTime(0.35, t);
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+        gain.gain.linearRampToValueAtTime(0.01, t + 0.18);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      } else if (type === 'alert') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, t);
+        gain.gain.setValueAtTime(0.6, t);
+        gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(220, t + 0.12);
+        gain2.gain.setValueAtTime(0, t);
+        gain2.gain.setValueAtTime(0.6, t + 0.12);
+        gain2.gain.linearRampToValueAtTime(0.01, t + 0.22);
+        osc2.connect(gain2);
+        gain2.connect(exportDestRef.current || ctx.destination);
+
+        osc.start(t);
+        osc2.start(t + 0.12);
+        osc.stop(t + 0.11);
+        osc2.stop(t + 0.23);
+      }
+    } catch (e) {
+      console.log('Web Audio API not supported or interaction required', e);
+    }
+  }, [soundEnabled]);
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const cTime = videoRef.current.currentTime;
+      const now = Date.now();
+
+      if (now - lastUpdateRef.current > 120) {
+        setCurrentTime(cTime);
+    const pastDuration = clipDurations.slice(0, currentClipIndex).reduce((a, b) => a + b, 0);
+    setGlobalTime(pastDuration + cTime);
         lastUpdateRef.current = now;
       }
 
@@ -1026,10 +1812,9 @@ ctx.fill();
       }} className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
         <video
           ref={videoRef}
-          src={videoUrl}
+          src={clips[currentClipIndex] || videoUrl}
           poster={poster || undefined}
           autoPlay
-          loop
           playsInline
           controls={false}
           controlsList={!isPreviewMode ? "nodownload" : undefined}
@@ -1037,7 +1822,26 @@ ctx.fill();
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => { setIsPlaying(true); setHasStarted(true); }}
           onPause={() => setIsPlaying(false)}
-          onLoadedMetadata={handleLoadedMetadata}
+          onLoadedMetadata={(e) => {
+            const duration = e.currentTarget.duration;
+            setClipDurations(prev => {
+                const updated = [...prev];
+                updated[currentClipIndex] = duration;
+                return updated;
+            });
+            handleLoadedMetadata(e as any);
+          }}
+          onEnded={() => {
+            if (currentClipIndex < clips.length - 1) {
+              setCurrentClipIndex(prev => prev + 1);
+            } else {
+              if (videoRef.current) {
+                videoRef.current.currentTime = 0;
+                setCurrentClipIndex(0);
+                videoRef.current.play();
+              }
+            }
+          }}
           className={videoClass}
         />
 
@@ -1377,6 +2181,19 @@ ctx.fill();
           {/* 控制列 */}
                 <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-sm border border-[#bbe3f8] mt-2 w-full max-w-sm sm:max-w-md">
                   <button
+                    onClick={() => { unlockAudio(); setCardsVisible(!cardsVisible); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${cardsVisible ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]" : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"}`}
+                  >
+                    🃏 字卡：{cardsVisible ? "開" : "關"}
+                  </button>
+
+                  <button
+                    onClick={() => { unlockAudio(); setSubtitlesVisible(!subtitlesVisible); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${subtitlesVisible ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]" : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"}`}
+                  >
+                    💬 字幕：{subtitlesVisible ? "開" : "關"}
+                  </button>
+                  <button
                     onClick={() => {
                       unlockAudio();
                       const v = videoRef.current;
@@ -1451,7 +2268,7 @@ ctx.fill();
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v6.2)
+                      🎬 匯出有聲 MP4 影片 (v7.0)
                     </button>
                   )}
                 </div>
