@@ -1,0 +1,7 @@
+feat: Implement multi-video stitching and preview URLs handling
+
+- Updated `src/app/page.tsx` to handle `videoUrls` from Redis data and pass it to `AiVideoPlayer`.
+- Fixed duplicate component declaration in `AiVideoPlayer.tsx`.
+- Updated `src/app/api/line/route.ts` to support multi-video stitching commands.
+- Configured LINE bot to collect multiple videos, stitch them, and generate a dynamic script with settings like mute (`第2段靜音`) and card toggles (`不要特效字卡`).
+- Ensured Redis saves state correctly for preview flow.
