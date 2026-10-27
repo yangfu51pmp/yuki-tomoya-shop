@@ -43,7 +43,7 @@ const LINE_ADMIN_USER_ID = process.env.LINE_ADMIN_USER_ID || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
-const BOT_TITLE = '【ユキ&トモヤ管理助手】';
+
 const REPO_FULL_NAME = 'yangfu51pmp/yuki-tomoya-shop';
 
 // 取得 SITE_URL 並清除可能的 Google 轉址與強制替換舊網址
@@ -593,7 +593,7 @@ async function callOpenRouterJson(prompt: string, models: string[]): Promise<{ s
 }
 
 // GitHub 程式碼修改核心（用於服務項目文字、顏色、版面調整）
-async function uploadVideoToGitHub(base64Content: string, isPreview: boolean = false): Promise<string | null> {
+async function uploadVideoToGitHub(base64Content: string, isPreview: boolean = false, customFilename?: string): Promise<string | null> {
   const githubToken = (process.env.GITHUB_TOKEN || '').trim();
   if (!githubToken) {
     console.error("No GITHUB_TOKEN provided.");
@@ -602,7 +602,7 @@ async function uploadVideoToGitHub(base64Content: string, isPreview: boolean = f
 
   try {
     let sha = "";
-    const filename = isPreview ? `preview-video-${Date.now()}.mp4` : "promo.mp4";
+    const filename = customFilename || (isPreview ? `preview-video-${Date.now()}.mp4` : "promo.mp4");
     // 1. 取得 public 目錄檔案列表，尋找檔案以取得 sha
     const listRes = await fetch(`https://api.github.com/repos/${REPO_FULL_NAME}/contents/public`, {
       headers: {
@@ -1173,6 +1173,34 @@ export async function POST(req: NextRequest) {
         if (REDIS_URL && LINE_CHANNEL_ACCESS_TOKEN) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
+
+          const stitchMode = await client.get("line_video_stitch_mode");
+          if (stitchMode === "collecting") {
+            const queueRaw = await client.get("line_video_stitch_queue");
+            const queue: string[] = queueRaw ? JSON.parse(queueRaw) : [];
+
+            try {
+              const videoRes = await fetch(`https://api-data.line.me/v2/bot/message/${event.message.id}/content`, {
+                headers: { Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}` }
+              });
+              if (videoRes.ok) {
+                const arrayBuffer = await videoRes.arrayBuffer();
+                const b64 = Buffer.from(arrayBuffer).toString("base64");
+                const filename = `preview-clip-${queue.length + 1}.mp4`;
+                const uploadedFilename = await uploadVideoToGitHub(b64, true, filename);
+
+                if (uploadedFilename) {
+                  const siteUrl = req.nextUrl.origin;
+                  const newVideoUrl = `${siteUrl}/${uploadedFilename}?t=${Date.now()}`;
+                  queue.push(newVideoUrl);
+                  await client.set("line_video_stitch_queue", JSON.stringify(queue));
+                  await replyLine(replyToken, "✅ 已收到第 " + queue.length + " 段串連影片！\n請繼續上傳下一支影片，或輸入：\n「@ユキ&トモヤ管理助手 完成串連：[背景音/台詞/字卡需求]」", undefined, targetId, startTime);
+                  await client.quit();
+                  continue;
+                }
+              }
+            } catch (err) {}
+          }
           const awaitingVideoUpload = await client.get("yt_awaiting_video_upload");
 
           if (awaitingVideoUpload === "1") {
@@ -1286,30 +1314,105 @@ export async function POST(req: NextRequest) {
       }
 
       const rawText = event.message.text.trim();
+      const isGroup = event.source?.type === 'group' || event.source?.type === 'room';
 
-      // 1. 群組過濾
-      const isCallingBot =
-        rawText.includes("@ユキ&トモヤ管理助手") ||
-        rawText.includes("ユキ&トモヤ") ||
-        rawText.includes("@助手") ||
-        rawText.includes("助手") ||
-        rawText.includes("截圖") ||
-        rawText.includes("修改") ||
-        rawText.includes("幫助");
+      // Strictly require @ユキ&トモヤ管理助手 in group chats!
+      if (isGroup && !rawText.includes('@ユキ&トモヤ管理助手') && !rawText.includes('@管理助手')) {
+        continue; // Ignore normal group chat messages completely
+      }
 
-      if (isGroupChat && !isCallingBot) {
-        continue;
+      // Strip the @ mention prefix so command matching works cleanly!
+      let cleanText = rawText
+        .replace(/@ユキ&トモヤ管理助手/g, '')
+        .replace(/@管理助手/g, '')
+        .replace(/^@\S+\s*/, '')
+        .trim();
+
+      // 1.5 Stitch commands (highest priority)
+      if (cleanText.includes('開始串連') || cleanText.includes('串連模式')) {
+        if (REDIS_URL) {
+          const client = createClient({ url: REDIS_URL });
+          await client.connect();
+          await client.set("line_video_stitch_queue", JSON.stringify([]));
+          await client.set("line_video_stitch_mode", "collecting");
+          await client.quit();
+
+          await replyLine(
+            replyToken,
+            "🎬 已開啟【多片串連模式】！\n請依序從手機上傳您要串連的第 1、2、3... 支影片到群組。\n\n全部傳完後，請輸入：\n「@ユキ&トモヤ管理助手 完成串連：[背景音、台詞、是否需要特效字卡需求]」",
+            undefined,
+            targetId,
+            startTime
+          );
+          continue;
+        }
+      }
+
+      if (cleanText.startsWith('完成串連') || cleanText.startsWith('串連製片')) {
+        if (REDIS_URL) {
+          const client = createClient({ url: REDIS_URL });
+          await client.connect();
+          const queueRaw = await client.get("line_video_stitch_queue");
+          let videoUrls = queueRaw ? JSON.parse(queueRaw) : [];
+          await client.set("line_video_stitch_mode", "idle");
+
+          if (videoUrls.length === 0) {
+            // Fallback to preview_video_data
+            const prevDataStr = await client.get("preview_video_data");
+            if (prevDataStr) {
+               try {
+                 const prevData = JSON.parse(prevDataStr);
+                 if (prevData.videoUrls && prevData.videoUrls.length > 0) {
+                    videoUrls = prevData.videoUrls;
+                 }
+               } catch (e) {}
+            }
+          }
+
+          if (videoUrls.length > 0) {
+             const directorPrompt = cleanText.split(/[:：]/).slice(1).join(':').trim() || "";
+
+             const aiScript = {
+               showCover: !directorPrompt.includes('不要片頭片尾'),
+               showOutro: !directorPrompt.includes('不要片頭片尾'),
+               showCards: !directorPrompt.includes('不要特效字卡'),
+               audioConfig: {
+                 clipMuted: videoUrls.map((_: any, i: number) => directorPrompt.includes(`第${i+1}段靜音`)),
+                 bgmStyle: 'warm_guitar'
+               },
+               subtitles: []
+             };
+
+             await client.set("preview_video_data", JSON.stringify({
+                videoUrl: videoUrls[0],
+                videoUrls,
+                aiScript,
+                timestamp: Date.now()
+             }));
+
+             const summary = `✅ 🎬 串連製片完成！AI 導演已收到您的指示：\n${directorPrompt ? '- 導演需求：' + directorPrompt : '- 預設製片模式'}\n\n🔗 專屬預覽連結：https://yuki-tomoya-shop.vercel.app/?preview=video`;
+             await replyLine(
+                replyToken,
+                `${summary}\n\n💬 後續操作指令：\n- 確認無誤請輸入：@ユキ&トモヤ管理助手 確認上架影片\n- 想調整字卡或字幕請輸入：@ユキ&トモヤ管理助手 修改製片：[您的修改要求]\n- 放棄請輸入：@ユキ&トモヤ管理助手 取消上架影片`,
+                undefined, targetId, startTime
+             );
+          } else {
+             await replyLine(replyToken, "找不到任何串連影片，請重新使用「@ユキ&トモヤ管理助手 開始串連」上傳。", undefined, targetId, startTime);
+          }
+          await client.quit();
+          continue;
+        }
       }
 
       // 1.5. 網址開頭自動處理 awaiting_video_upload
-      if (rawText.startsWith("http://") || rawText.startsWith("https://")) {
+      if (cleanText.startsWith("http://") || cleanText.startsWith("https://")) {
         if (REDIS_URL) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
           const awaitingVideoUpload = await client.get("yt_awaiting_video_upload");
 
           if (awaitingVideoUpload === "1") {
-            const newVideoUrl = rawText;
+            const newVideoUrl = cleanText;
             await client.set("yt_site_promo_video", newVideoUrl);
             await client.del("yt_awaiting_video_upload");
             await client.quit();
@@ -1319,7 +1422,7 @@ export async function POST(req: NextRequest) {
             const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, newVideoUrl);
             await replyLine(
               replyToken,
-              `${BOT_TITLE}\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+              `🤖 ユキ&トモヤ管理助手\n已成功接收並更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
               screenshot
             , targetId, startTime);
             continue;
@@ -1329,7 +1432,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 2. 徹底清理輸入文字
-      const cleanText = rawText
+      cleanText = cleanText
         .replace(/@Sport\s*Cafe\s*(管理)?助手/gi, "")
         .replace(/@Sport\s*Cafe/gi, "")
         .replace(/@ユキ&トモヤ/gi, "")
@@ -1467,7 +1570,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已為您即時抓取最新手機版官網畫面：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已為您即時抓取最新手機版官網畫面：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -1503,7 +1606,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot();
           await replyLine(
             replyToken,
-            `${BOT_TITLE}\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+            `🤖 ユキ&トモヤ管理助手\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           , targetId, startTime);
           continue;
@@ -1524,7 +1627,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot(undefined, directNotice);
           await replyLine(
             replyToken,
-            `${BOT_TITLE}\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\n${SITE_URL}`,
+            `🤖 ユキ&トモヤ管理助手\n已成功更新門市公告：\n「${directNotice}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           , targetId, startTime);
           continue;
@@ -1545,7 +1648,7 @@ export async function POST(req: NextRequest) {
           const screenshot = await captureWebsiteScreenshot(newTitle, undefined);
           await replyLine(
             replyToken,
-            `${BOT_TITLE}\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
+            `🤖 ユキ&トモヤ管理助手\n已成功更新網站主標題：\n「${newTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           , targetId, startTime);
           continue;
@@ -1565,7 +1668,7 @@ export async function POST(req: NextRequest) {
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已為您恢復網站預設背景！\n\n官網已即時生效：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已為您恢復網站預設背景！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -1857,7 +1960,7 @@ ${userModification}
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, newVideoUrl);
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已成功更新網站影片：\n${newVideoUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -1876,7 +1979,7 @@ ${userModification}
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, undefined, newVideoTitle);
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已成功更新影片標題：\n「${newVideoTitle}」\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -1894,7 +1997,7 @@ ${userModification}
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, undefined, "hidden");
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已隱藏宣傳影片區塊！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -1911,7 +2014,7 @@ ${userModification}
         const screenshot = await captureWebsiteScreenshot();
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已恢復預設宣傳影片！\n\n官網已即時生效：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已恢復預設宣傳影片！\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -2002,22 +2105,22 @@ ${userModification}
               const screenshot = await captureWebsiteScreenshot();
               await replyLine(
                 replyToken,
-                `${BOT_TITLE}\n已成功為您恢復為上一版的版面狀態！`,
+                `🤖 ユキ&トモヤ管理助手\n已成功為您恢復為上一版的版面狀態！`,
                 screenshot
               , targetId, startTime);
               continue;
             } else {
               if (redisClient) await redisClient.quit();
-              await replyLine(replyToken, `${BOT_TITLE}恢復失敗：更新 GitHub 檔案時發生錯誤。`, undefined, targetId, startTime);
+              await replyLine(replyToken, `🤖 ユキ&トモヤ管理助手恢復失敗：更新 GitHub 檔案時發生錯誤。`, undefined, targetId, startTime);
               continue;
             }
           } else {
              if (redisClient) await redisClient.quit();
-             await replyLine(replyToken, `${BOT_TITLE}恢復失敗：找不到前一版的歷史紀錄。`, undefined, targetId, startTime);
+             await replyLine(replyToken, `🤖 ユキ&トモヤ管理助手恢復失敗：找不到前一版的歷史紀錄。`, undefined, targetId, startTime);
              continue;
           }
         } catch {
-           await replyLine(replyToken, `${BOT_TITLE}恢復失敗：發生系統例外錯誤。`, undefined, targetId, startTime);
+           await replyLine(replyToken, `🤖 ユキ&トモヤ管理助手恢復失敗：發生系統例外錯誤。`, undefined, targetId, startTime);
            continue;
         }
       }
@@ -2034,7 +2137,7 @@ ${userModification}
         const screenshot = await captureWebsiteScreenshot(undefined, undefined, newBgUrl);
         await replyLine(
           replyToken,
-          `${BOT_TITLE}\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\n${SITE_URL}`,
+          `🤖 ユキ&トモヤ管理助手\n已成功更新網站背景：\n${newBgUrl}\n\n官網已即時生效：\n${SITE_URL}`,
           screenshot
         , targetId, startTime);
         continue;
@@ -2172,16 +2275,19 @@ ${userModification}
           , targetId, startTime);
           continue;
         } else {
-          await replyLine(replyToken, `${BOT_TITLE}調整未完成：${result.message}`, undefined, targetId, startTime);
+          await replyLine(replyToken, `🤖 ユキ&トモヤ管理助手調整未完成：${result.message}`, undefined, targetId, startTime);
           continue;
         }
       }
 
       // 10. 一般引導回覆
-      await replyLine(
-        replyToken,
-        "${BOT_TITLE}\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
-      , undefined, targetId, startTime);
+      if (cleanText === "" || cleanText === "幫助" || cleanText === "說明") {
+        await replyLine(
+          replyToken,
+          "🤖 ユキ&トモヤ管理助手\n您可以這樣交代我：\n\n• 標題改為：因颱風影響全館休息。\n• 公告改為：民安少棒・巨人盃賽事直播中！\n• 把「專業嚴選裝備」改成「職人嚴選裝備」\n• 截圖（查看目前畫面）"
+        , undefined, targetId, startTime);
+        continue;
+      }
     }
 
     return NextResponse.json({ success: true });
