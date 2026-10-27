@@ -1191,9 +1191,15 @@ export async function POST(req: NextRequest) {
 
                 if (uploadedFilename) {
                   const siteUrl = req.nextUrl.origin;
-                  const newVideoUrl = `${siteUrl}/${uploadedFilename}?t=${Date.now()}`;
+                  const rawVideoUrl = `https://raw.githubusercontent.com/${REPO_FULL_NAME}/main/public/${uploadedFilename}?t=${Date.now()}`;
+                  const newVideoUrl = rawVideoUrl;
                   queue.push(newVideoUrl);
                   await client.set("line_video_stitch_queue", JSON.stringify(queue));
+
+                  const aiScriptTemp = { showCover: false, showOutro: false, showCards: false, showSubtitles: true };
+                  const previewDataObj = { videoUrl: queue[0], videoUrls: queue, aiScript: aiScriptTemp, timestamp: Date.now() };
+                  await client.set("preview_video_data", JSON.stringify(previewDataObj));
+                  await client.set("published_video_data", JSON.stringify(previewDataObj));
                   await replyLine(replyToken, "✅ 已收到第 " + queue.length + " 段串連影片！\n請繼續上傳下一支影片，或輸入：\n「@ユキ&トモヤ管理助手 完成串連：[背景音/台詞/字卡需求]」", undefined, targetId, startTime);
                   await client.quit();
                   continue;
@@ -1223,12 +1229,17 @@ export async function POST(req: NextRequest) {
 
                 if (uploadedFilename) {
                   const siteUrl = req.nextUrl.origin;
-                  const newVideoUrl = `${siteUrl}/${uploadedFilename}?v=${Date.now()}`;
+                  const rawVideoUrl = `https://raw.githubusercontent.com/${REPO_FULL_NAME}/main/public/${uploadedFilename}?t=${Date.now()}`;
+                  const newVideoUrl = rawVideoUrl;
 
                   if (isAiPreview) {
                     await client.set("yt_preview_video", newVideoUrl);
                   } else {
                     await client.set("yt_site_promo_video", newVideoUrl);
+                    // Single Video Upload (不用AI製片 / normal video upload): Update BOTH preview_video_data and published_video_data in Redis
+                    const normalDataObj = { videoUrl: rawVideoUrl, videoUrls: [rawVideoUrl], aiScript: null, mode: 'raw', timestamp: Date.now() };
+                    await client.set("preview_video_data", JSON.stringify(normalDataObj));
+                    await client.set("published_video_data", JSON.stringify(normalDataObj));
                   }
                   await client.set("yt_last_uploaded_video", newVideoUrl);
 
@@ -1383,12 +1394,15 @@ export async function POST(req: NextRequest) {
                subtitles: []
              };
 
-             await client.set("preview_video_data", JSON.stringify({
+             const stitchDataObj = {
                 videoUrl: videoUrls[0],
                 videoUrls,
                 aiScript,
                 timestamp: Date.now()
-             }));
+             };
+             await client.set("preview_video_data", JSON.stringify(stitchDataObj));
+             // Immediately update published_video_data to play the exact new stitched video
+             await client.set("published_video_data", JSON.stringify(stitchDataObj));
 
              const summary = `✅ 🎬 串連製片完成！AI 導演已收到您的指示：\n${directorPrompt ? '- 導演需求：' + directorPrompt : '- 預設製片模式'}\n\n🔗 專屬預覽連結：https://yuki-tomoya-shop.vercel.app/?preview=video`;
              await replyLine(
@@ -1784,6 +1798,12 @@ export async function POST(req: NextRequest) {
         if (previewVideo || previewScript) {
           if (previewVideo) await client.set("yt_site_promo_video", previewVideo);
           if (previewScript) await client.set("yt_video_ai_script", previewScript);
+
+          // Confirm publish: update published_video_data to match preview_video_data
+          const prevDataStr = await client.get("preview_video_data");
+          if (prevDataStr) {
+            await client.set("published_video_data", prevDataStr);
+          }
 
           await client.del("yt_preview_video");
           await client.del("yt_preview_ai_script");
