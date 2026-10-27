@@ -211,23 +211,39 @@ export default function AiVideoPlayer({
   const isValidScript = aiScript && aiScript.subtitles && aiScript.subtitles.length >= 3 && !isHallucinated;
   const isMultiClip = clips.length >= 2;
 
+
+  const activeClipUrl = clips[currentClipIndex] || videoUrl;
+
   if (isValidScript) {
     resolvedScript = aiScript;
   } else {
     // Dynamic fallback based on video duration
     const currentDuration = videoRef.current?.duration || 0;
-    if (currentDuration > 0 && currentDuration <= 50) {
+
+    // Only use COACH_PRAISE_39S_SCRIPT if aiScript explicitly matched Coach Kusano.
+    // Otherwise fallback to BRAND_30S_STITCHED_SCRIPT
+    const isCoachKusano = aiScript?.cover?.title?.includes('草野');
+
+    if (clips.length >= 2 || (activeClipUrl && (activeClipUrl.includes('preview-clip') || activeClipUrl.includes('featured-video')))) {
+       resolvedScript = isCoachKusano ? COACH_PRAISE_39S_SCRIPT : BRAND_30S_STITCHED_SCRIPT as any;
+    } else if (currentDuration > 0 && currentDuration <= 50) {
       resolvedScript = (isMultiClip ? BRAND_30S_STITCHED_SCRIPT : COACH_PRAISE_39S_SCRIPT) as any;
     } else if (currentDuration > 50) {
       resolvedScript = FULL_71S_SCRIPT as any;
     } else {
-      // Default to 39s if duration is unknown yet, we can update later but initially
-      resolvedScript = COACH_PRAISE_39S_SCRIPT as any;
+      resolvedScript = BRAND_30S_STITCHED_SCRIPT as any;
     }
   }
 
+
   const rawVideoArrayBufferRefs = useRef<(ArrayBuffer | null)[]>([]);
   const decodedAudioBufferRefs = useRef<(AudioBuffer | null)[]>([]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
+    }
+  }, [activeClipUrl]);
 
   useEffect(() => {
     rawVideoArrayBufferRefs.current = new Array(clips.length).fill(null);
@@ -633,7 +649,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
             const isMuted = resolvedScript?.audioConfig?.clipMuted?.[clipIdx];
             if (!isMuted) {
                 if (!decodedAudioBufferRefs.current[clipIdx] && rawVideoArrayBufferRefs.current[clipIdx]) {
-                  decodedAudioBufferRefs.current[clipIdx] = await actx.decodeAudioData(rawVideoArrayBufferRefs.current[clipIdx].slice(0));
+                  decodedAudioBufferRefs.current[clipIdx] = await actx.decodeAudioData(rawVideoArrayBufferRefs.current[clipIdx]!.slice(0));
                 }
 
                 v.currentTime = 0;
@@ -859,21 +875,21 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
 
                                 ctx.fillStyle = "#78C4EC";
                                 ctx.font = `bold ${vh * 0.02}px sans-serif`;
-                                ctx.fillText(resolvedScript.outro.badge, cx, cy - vh * 0.15);
+                                ctx.fillText(resolvedScript.outro?.badge || '', cx, cy - vh * 0.15);
 
                                 ctx.fillStyle = "#0F172A";
                                 ctx.font = `bold ${vh * 0.04}px "PingFang TC", "Microsoft JhengHei"`;
-                                ctx.fillText(resolvedScript.outro.title, cx, cy - vh * 0.08);
+                                ctx.fillText(resolvedScript.outro?.title || '', cx, cy - vh * 0.08);
 
                                 ctx.fillStyle = "#444444";
                                 ctx.font = `bold ${vh * 0.025}px "PingFang TC", "Microsoft JhengHei"`;
-                                (resolvedScript.outro.points || []).forEach((pt: any, i: number) => {
+                                (resolvedScript.outro?.points || []).forEach((pt: any, i: number) => {
                                     ctx.fillText(pt, cx, cy + (i * vh * 0.04));
                                 });
 
                                 ctx.fillStyle = "#666666";
                                 ctx.font = `bold ${vh * 0.018}px sans-serif`;
-                                ctx.fillText(resolvedScript.outro.credit, cx, cy + vh * 0.15);
+                                ctx.fillText(resolvedScript.outro?.credit || '', cx, cy + vh * 0.15);
                             }
 
                             const activeSub = resolvedScript.subtitles?.find(s => cTime >= s.start && cTime <= s.end);
@@ -974,9 +990,9 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
         }
       }} className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
         <video
+          key={activeClipUrl}
           ref={videoRef}
-          src={clips[currentClipIndex] || videoUrl}
-          poster={poster || undefined}
+          src={activeClipUrl}
           autoPlay
           playsInline
           controls={false}
