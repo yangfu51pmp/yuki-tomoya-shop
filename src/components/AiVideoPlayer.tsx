@@ -499,10 +499,10 @@ export default function AiVideoPlayer({
   }
 
   const activeEffects = {
-    cover: resolvedScript?.cover && currentTime >= 0 && currentTime <= coverEnd,
+    cover: cardsVisible !== false && resolvedScript?.cover && currentTime >= 0 && currentTime <= coverEnd,
     subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
-    events: finalActiveEvents,
-    outro: resolvedScript?.outro && currentTime >= outroStart,
+    events: cardsVisible !== false ? finalActiveEvents : [],
+    outro: cardsVisible !== false && resolvedScript?.outro && currentTime >= outroStart,
   };
 
   const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
@@ -703,7 +703,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                             const cx = vw / 2;
                             const cy = vh / 2;
 
-                            if (!(resolvedScript.cover && resolvedScript.showCover !== false && cTime <= 3.5)) {
+                            if (!(resolvedScript.cover && resolvedScript.showCover !== false && cTime <= 3.5) && cardsVisible !== false && resolvedScript.showBadge !== false) {
                                 ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
                                 ctx.beginPath();
                                 ctx.roundRect(vw * 0.03, vh * 0.05, vw * 0.28, vh * 0.075, vh * 0.0375);
@@ -742,7 +742,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                             const isOutro = resolvedScript.outro && resolvedScript.showOutro !== false && totalDuration > 10 && cTime >= totalDuration - 3.3;
 
                             const allEventsForCards = (resolvedScript.events || resolvedScript.numberedPills || []).map((e: any) => ({...e, type: e.type || 'numbered_pill'}));
-                            const activeEvts = cardsVisible ? allEventsForCards.filter((e: any) => cTime >= e.start && cTime <= e.end) : [];
+                            const activeEvts = cardsVisible !== false ? allEventsForCards.filter((e: any) => cTime >= e.start && cTime <= e.end) : [];
 
                             for (const evt of activeEvts) {
                                 ctx.textAlign = 'left';
@@ -864,7 +864,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                                 }
                             }
 
-                            if (isOutro) {
+                            if (isOutro && cardsVisible !== false) {
                                 ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
                                 ctx.beginPath();
                                 ctx.roundRect(vw * 0.05, cy - vh * 0.2, vw * 0.9, vh * 0.4, vh * 0.03);
@@ -1130,7 +1130,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
           <div className="absolute inset-0 pointer-events-none overflow-hidden font-sans">
 
             {/* 常駐左上角標籤 */}
-            {!activeEffects.cover && (
+            {!activeEffects.cover && cardsVisible !== false && resolvedScript.showBadge !== false && (
               <div className="absolute z-10 flex items-center justify-center bg-white/95 px-3 rounded-full shadow-sm border border-white/50" style={{ top: '5%', left: '3%', width: '28%', height: '7.5%' }}>
                 <span className="font-bold text-[#6d6d6d] whitespace-nowrap" style={{ fontSize: '3.5cqh' }}>✨ ユキ&トモヤ｜日本實拍</span>
               </div>
