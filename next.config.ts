@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/og-share.jpg",
+        destination: "/api/line?og_img=1",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

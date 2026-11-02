@@ -12,16 +12,40 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "ユキ&トモヤ 日本選物代購",
-  description: "空間、咖啡與你的訓練日常。無人自助手沖、即時席位與運動裝備借測。",
-};
-
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
   themeColor: "#141416",
+};
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://yuki-tomoya-shop.vercel.app"),
+  title: "ユキ&トモヤ 日本選物代購｜日本職人好物・安心直送台灣",
+  description: "嚴選日本棒壘運動裝備、KUMON公文教材文具、家庭保健益生菌與日本質感生活百貨。日本仙台現地連線直送。",
+  openGraph: {
+    title: "ユキ&トモヤ 日本選物代購｜日本職人好物・安心直送台灣",
+    description: "嚴選日本棒壘運動裝備、KUMON公文教材文具、家庭保健益生菌與日本質感生活百貨。日本仙台現地連線直送。",
+    url: "https://yuki-tomoya-shop.vercel.app",
+    siteName: "ユキ&トモヤ 日本選物代購",
+    locale: "zh_TW",
+    type: "website",
+    images: [
+      {
+        url: "https://yuki-tomoya-shop.vercel.app/og-share.jpg",
+        width: 1200,
+        height: 628,
+        alt: "ユキ&トモヤ 日本選物代購",
+        type: "image/jpeg",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ユキ&トモヤ 日本選物代購｜日本職人好物・安心直送台灣",
+    description: "嚴選日本棒壘運動裝備、KUMON公文教材文具、家庭保健益生菌與日本質感生活百貨。",
+    images: ["https://yuki-tomoya-shop.vercel.app/og-share.jpg"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
