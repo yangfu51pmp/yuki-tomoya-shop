@@ -896,10 +896,13 @@ async function analyzeVideoWithAI(videoBuffer: Buffer | null, userHint: string) 
 嚴格要求：
 - 必須 100% 逐字翻譯並生成覆蓋全片時間軸的中文字幕！
 - 絕對不要憑空捏造無關的開箱物品，例如香水瓶 (香水瓶) 或禮物盒 (禮物盒)！
+- 【日系雜誌質感語言規範】：
+  1. 【中日質感混搭黃金比例】：所有生成的 subtitles（字幕 text 與 highlight）、cover、events 內容，必須以「台灣繁體中文為主體（約 85%）」，並自然保留或點綴「日文品牌字與日系質感詞彙（約 15%，例如：ユキ&トモヤ、職人厳選、仙台現地、日本直送等）」，呈現高級日系選物店氛圍，同時避免整句純日文影響閱讀！
+  2. 【指定台詞 100% 保留】：當管理員提出特定修改要求或指定特定段落的字幕時，必須 100% 原字保留並精準對應到該段影片的秒數區間！
 請為這段影片執行「兩階段高密度 AI 影音導演引擎」分析，並輸出單一完整且嚴格的 JSON 格式（不要加上 \`\`\`json 標籤，純粹輸出 JSON）。
 
 【任務一：100% 逐句對嘴字幕（subtitles 陣列）與✂️ AI 氣口剪輯（speechSegments 陣列）】
-1. 嚴禁濃縮或省略！必須將影片中講者說的「每一句話、每一個短句」100% 完整聽寫出來（若原片為日文，請轉譯為自然流暢的繁體中文字幕或中日對照；若原片無說話聲，則依畫面動作每 2 秒生成一句精準的現場解說旁白字幕）。每個字幕片段長度控制在 1.2 秒 ～ 3.0 秒之間，精準標註 start 與 end 秒數。每句字幕必須挑出 1 個核心關鍵詞填入 highlight，並指定 color（'sky'、'coral'、'amber' 交替）。
+1. 嚴禁濃縮或省略！必須將影片中講者說的「每一句話、每一個短句」100% 完整聽寫出來（若原片為日文，請轉譯為自然流暢的繁體中文字幕，並遵循「台灣繁體中文約 85% 搭配日系質感詞彙約 15%」規範；若原片無說話聲，則依畫面動作每 2 秒生成一句精準的現場解說旁白字幕）。每個字幕片段長度控制在 1.2 秒 ～ 3.0 秒之間，精準標註 start 與 end 秒數。每句字幕必須挑出 1 個核心關鍵詞填入 highlight，並指定 color（'sky'、'coral'、'amber' 交替）。
 2. 同時生成 \`speechSegments: [{ start: number, end: number, zoomLevel: 1 | 1.07 }]\` 陣列，標記真正有說話或精彩動作的連續區間，剔除換氣與空白停頓，並在相鄰片段交替設定 \`1\` 與 \`1.07\` 鏡頭縮放。
 
 【任務二：每 2～3 秒高密度視覺字卡事件流（events 陣列）】
@@ -1108,11 +1111,11 @@ function parseMp4Duration(buffer: Buffer): number {
 async function generateStitchedAiScript(directorPrompt: string, videoUrls: string[], totalSec: number = 30): Promise<any> {
   const scaleRatio = totalSec > 0 ? totalSec / 30 : 1;
   const rawSubtitles = [
-    { start: 0.8, end: 5.0, text: "YUKI & TOMOYA 日本仙台職人生活選物", highlight: "YUKI & TOMOYA", color: "sky" },
-    { start: 5.0, end: 10.0, text: "為您精選獨具匠心的日本好物", highlight: "精選獨具匠心", color: "amber" },
-    { start: 10.0, end: 15.0, text: "質感生活，從這裡開始", highlight: "質感生活", color: "sky" },
-    { start: 15.0, end: 20.0, text: "探索更多精選商品，體驗日本職人精神", highlight: "日本職人精神", color: "amber" },
-    { start: 20.0, end: 25.0, text: "歡迎來到 YUKI & TOMOYA 的世界", highlight: "YUKI & TOMOYA", color: "sky" }
+    { start: 0.8, end: 5.0, text: "ユキ&トモヤ 仙台現地直達，職人嚴選好物", highlight: "職人厳選", color: "sky" },
+    { start: 5.0, end: 10.0, text: "為您精選獨具匠心的日本直送生活選品", highlight: "日本直送", color: "amber" },
+    { start: 10.0, end: 15.0, text: "質感生活提案，從走進仙台店內開始", highlight: "仙台現地", color: "sky" },
+    { start: 15.0, end: 20.0, text: "探索更多職人手作好物，感受純粹日系溫度", highlight: "職人手作", color: "amber" },
+    { start: 20.0, end: 25.0, text: "歡迎來到 ユキ&トモヤ 的日系生活選物世界", highlight: "ユキ&トモヤ", color: "sky" }
   ];
 
   const defaultSubtitles = rawSubtitles.map(s => ({
@@ -1122,9 +1125,9 @@ async function generateStitchedAiScript(directorPrompt: string, videoUrls: strin
   }));
 
   const defaultEvents = [
-    { id: "e1", type: "numbered_pill", number: 1, start: Math.round(2.0 * scaleRatio * 10) / 10, end: Math.round(9.0 * scaleRatio * 10) / 10, side: "left", title: "日本仙台職人選物", sfx: "pop" },
-    { id: "e2", type: "numbered_pill", number: 2, start: Math.round(10.0 * scaleRatio * 10) / 10, end: Math.round(18.0 * scaleRatio * 10) / 10, side: "right", title: "質感生活選品推薦", sfx: "pop" },
-    { id: "e3", type: "numbered_pill", number: 3, start: Math.round(19.0 * scaleRatio * 10) / 10, end: Math.round(26.0 * scaleRatio * 10) / 10, side: "left", title: "日本現地直送安心保證", sfx: "pop" }
+    { id: "e1", type: "numbered_pill", number: 1, start: Math.round(2.0 * scaleRatio * 10) / 10, end: Math.round(9.0 * scaleRatio * 10) / 10, side: "left", title: "仙台現地・職人厳選", sfx: "pop" },
+    { id: "e2", type: "numbered_pill", number: 2, start: Math.round(10.0 * scaleRatio * 10) / 10, end: Math.round(18.0 * scaleRatio * 10) / 10, side: "right", title: "質感生活・選品推薦", sfx: "pop" },
+    { id: "e3", type: "numbered_pill", number: 3, start: Math.round(19.0 * scaleRatio * 10) / 10, end: Math.round(26.0 * scaleRatio * 10) / 10, side: "left", title: "日本直送・安心保證", sfx: "pop" }
   ];
 
   const baseScript: any = {
@@ -1138,17 +1141,17 @@ async function generateStitchedAiScript(directorPrompt: string, videoUrls: strin
       bgmStyle: directorPrompt.includes("柔和背景音") ? "soft_ambient" : "warm_guitar"
     },
     cover: {
-      issue: "ISSUE 09｜日本仙台・職人生活選物",
-      title: "YUKI & TOMOYA",
-      subtitle: "日本現地連線・質感選物代購",
-      stamp: "品質嚴選",
-      speakerName: "YUKI & TOMOYA",
-      speakerTitle: "日本仙台生活選物"
+      issue: "ISSUE 09｜仙台現地・職人生活選物",
+      title: "ユキ&トモヤ",
+      subtitle: "仙台現地直送・職人厳選代購",
+      stamp: "職人厳選",
+      speakerName: "ユキ&トモヤ",
+      speakerTitle: "仙台現地生活選物"
     },
     outro: {
-      badge: "🇯🇵 YUKI & TOMOYA｜日本直達",
-      title: "日本好物・質感生活",
-      points: ["1️⃣ 現地採購：日本仙台門市直購直送", "2️⃣ 嚴選品質：職人精神安心保證", "3️⃣ 專人客服：歡迎 LINE 預約諮詢"],
+      badge: "🇯🇵 ユキ&トモヤ｜日本直送",
+      title: "日本直送・質感生活",
+      points: ["1️⃣ 現地採購：仙台門市直購直送", "2️⃣ 職人厳選：職人手作安心保證", "3️⃣ 專人客服：歡迎 LINE 預約諮詢"],
       credit: "ユキ&トモヤ 日本選物代購",
       cta: "💬 歡迎加 LINE 諮詢選物"
     },
@@ -1162,8 +1165,12 @@ async function generateStitchedAiScript(directorPrompt: string, videoUrls: strin
 "${directorPrompt}"
 
 請根據管理員需求，設計 0.0s ~ ${totalSec.toFixed(1)}s 全域時間軸的腳本。
+【日系雜誌質感語言規範】：
+1. 【中日質感混搭黃金比例】：所有生成的 subtitles（字幕 text 與 highlight）、cover、events 內容，必須以「台灣繁體中文為主體（約 85%）」，並自然保留或點綴「日文品牌字與日系質感詞彙（約 15%，例如：ユキ&トモヤ、職人厳選、仙台現地、日本直送等）」，呈現高級日系選物店氛圍，同時避免整句純日文影響閱讀！
+2. 【指定台詞 100% 保留】：當管理員指定特定段落的字幕（例如：把第2段的字幕改成「走進店內，感受職人手作皮革手套的溫潤手感」或指定特定台詞），必須 100% 原字保留並精準對應到該段影片的秒數區間！
+
 嚴格規則：
-1. subtitles 陣列必須包含覆蓋 0.0s ~ ${(totalSec * 0.85).toFixed(1)}s 的字幕（每段 2~4 秒，包含 start, end, text, highlight, color），若管理員無特別指定自訂台詞，請以高品質日系選物品牌台詞為主。
+1. subtitles 陣列必須包含覆蓋 0.0s ~ ${(totalSec * 0.85).toFixed(1)}s 的字幕（每段 2~4 秒，包含 start, end, text, highlight, color），若管理員無特別指定自訂台詞，請以高品質日系選物品牌台詞為主（符合中日質感混搭黃金比例）。
 2. events 陣列必須包含適當的視覺字卡事件（若管理員要求不要字卡，則 events 為空陣列 []）。
 3. 如果要求靜音某段，audioConfig.clipMuted 相應位置設為 true。
 4. 如果要求不要封面或不要片頭片尾，showCover 與 showOutro 設為 false。
@@ -2323,6 +2330,10 @@ ${rawScript}
 
 使用者要求：
 ${userModification}
+
+【日系雜誌質感語言規範】：
+1. 【中日質感混搭黃金比例】：所有生成的 subtitles（字幕 text 與 highlight）、cover、events 內容，必須以「台灣繁體中文為主體（約 85%）」，並自然保留或點綴「日文品牌字與日系質感詞彙（約 15%，例如：ユキ&トモヤ、職人厳選、仙台現地、日本直送等）」，呈現高級日系選物店氛圍，同時避免整句純日文影響閱讀！
+2. 【指定台詞 100% 保留】：當管理員指定特定段落的字幕（例如：把第2段的字幕改成「走進店內，感受職人手作皮革手套的溫潤手感」或指定特定台詞），必須 100% 原字保留並精準對應到該段影片的秒數區間！
 
 請直接回傳完整的修改後 JSON 腳本，不要包含任何其他文字或 \`\`\` 標記。`;
 
