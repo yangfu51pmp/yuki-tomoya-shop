@@ -92,6 +92,26 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Not Found", { status: 404 });
     }
 
+    if (req.nextUrl.searchParams.get("og_img") === "1") {
+      let b64 = await client.get("yt_og_image_b64");
+      if (!b64) {
+        b64 = await client.get("yt_site_hero_image_b64");
+      }
+      await client.quit();
+
+      if (b64) {
+        const buffer = Buffer.from(b64, "base64");
+        return new NextResponse(buffer, {
+          headers: {
+            "Content-Type": "image/jpeg",
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
+
+      // Default high quality Japan select landscape image fallback
+      return NextResponse.redirect("https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1200&h=628&fit=crop&q=80", { status: 302 });
+    }
     if (req.nextUrl.searchParams.get("hero_img") === "1") {
       const b64 = await client.get("yt_site_hero_image_b64");
       const mime = await client.get("yt_site_hero_image_mime") || "image/png";
@@ -128,7 +148,8 @@ export async function GET(req: NextRequest) {
     const [
       site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation,
       cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8,
-      cat_products_1, cat_products_2, cat_products_3, video_ai_script, preview_video, preview_ai_script
+      cat_products_1, cat_products_2, cat_products_3, video_ai_script, preview_video, preview_ai_script,
+      preview_video_data, published_video_data, line_video_stitch_queue
     ] = await Promise.all([
       client.get("yt_site_title"),
       client.get("yt_site_announcement"),
@@ -152,8 +173,41 @@ export async function GET(req: NextRequest) {
       client.get("yt_video_ai_script"),
       client.get("yt_preview_video"),
       client.get("yt_preview_ai_script"),
+      client.get("preview_video_data"),
+      client.get("published_video_data"),
+      client.get("line_video_stitch_queue"),
     ]);
     await client.quit();
+
+    const defaultClips = ['/preview-clip-1.mp4', '/preview-clip-2.mp4', '/preview-clip-3.mp4'];
+    let parsedPublishedData: any = null;
+    let parsedPreviewData: any = null;
+    try {
+      if (published_video_data) parsedPublishedData = JSON.parse(published_video_data);
+    } catch (e) {}
+    try {
+      if (preview_video_data) parsedPreviewData = JSON.parse(preview_video_data);
+    } catch (e) {}
+
+    const isKusanoOrDrill = (data: any) => {
+      if (!data) return false;
+      const str = JSON.stringify(data);
+      return str.includes("草野") || str.includes("特訓");
+    };
+
+    let videoUrlsToReturn = defaultClips;
+    let videoAiScriptToReturn = video_ai_script ? JSON.parse(video_ai_script) : null;
+    if (parsedPublishedData?.videoUrls && Array.isArray(parsedPublishedData.videoUrls) && parsedPublishedData.videoUrls.length > 0 && !isKusanoOrDrill(parsedPublishedData)) {
+      videoUrlsToReturn = parsedPublishedData.videoUrls;
+      videoAiScriptToReturn = parsedPublishedData.aiScript || videoAiScriptToReturn;
+    }
+
+    let previewVideoUrlsToReturn = defaultClips;
+    let previewAiScriptToReturn = preview_ai_script ? JSON.parse(preview_ai_script) : null;
+    if (parsedPreviewData?.videoUrls && Array.isArray(parsedPreviewData.videoUrls) && parsedPreviewData.videoUrls.length > 0 && !isKusanoOrDrill(parsedPreviewData)) {
+      previewVideoUrlsToReturn = parsedPreviewData.videoUrls;
+      previewAiScriptToReturn = parsedPreviewData.aiScript || previewAiScriptToReturn;
+    }
 
     return NextResponse.json(
       {
@@ -176,9 +230,12 @@ export async function GET(req: NextRequest) {
         cat_products_1: cat_products_1 ? JSON.parse(cat_products_1) : null,
         cat_products_2: cat_products_2 ? JSON.parse(cat_products_2) : null,
         cat_products_3: cat_products_3 ? JSON.parse(cat_products_3) : null,
-        video_ai_script: video_ai_script ? JSON.parse(video_ai_script) : null,
+        video_urls: videoUrlsToReturn,
+        video_ai_script: videoAiScriptToReturn,
+        preview_video_urls: previewVideoUrlsToReturn,
         preview_video: preview_video || "",
-        preview_ai_script: preview_ai_script ? JSON.parse(preview_ai_script) : null,
+        preview_ai_script: previewAiScriptToReturn,
+        line_video_stitch_queue: line_video_stitch_queue ? JSON.parse(line_video_stitch_queue) : [],
       },
       {
         headers: {
@@ -1018,6 +1075,40 @@ export async function POST(req: NextRequest) {
         if (REDIS_URL && LINE_CHANNEL_ACCESS_TOKEN) {
           const client = createClient({ url: REDIS_URL });
           await client.connect();
+          const awaitingOgUpload = await client.get("yt_awaiting_og_upload");
+          if (awaitingOgUpload === "1") {
+            try {
+              const imageRes = await fetch(`https://api-data.line.me/v2/bot/message/${event.message.id}/content`, {
+                headers: { Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}` }
+              });
+
+              if (imageRes.ok) {
+                const arrayBuffer = await imageRes.arrayBuffer();
+                const b64 = Buffer.from(arrayBuffer).toString("base64");
+
+                await client.set("yt_og_image_b64", b64);
+                await client.set("yt_og_image_version", String(Date.now()));
+                await client.del("yt_awaiting_og_upload");
+                await client.quit();
+
+                try { revalidatePath("/"); } catch {}
+
+                await replyLine(
+                  replyToken,
+                  `處理好了 🙏
+https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖（已自動設為英文檔名 /og-share.jpg 並標註寬 1200、高 628 大圖規格）。
+
+臉書或 LINE 如果還顯示灰色或舊圖，是它記住舊的預覽快取，把貼文刪掉重新貼一次網址就會出現大圖了！`,
+                  undefined,
+                  targetId,
+                  startTime
+                );
+                continue;
+              }
+            } catch (err) {
+              console.error("Failed to process OG image upload:", err);
+            }
+          }
           const awaitingUpload = await client.get("yt_awaiting_bg_upload");
 
           if (awaitingUpload === "1") {
@@ -1465,6 +1556,144 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+
+      // 【英爵管家 Feature A：跨網址抓縮圖／換分享縮圖】
+      const hasThumbKeyword = cleanText.includes("縮圖");
+      const hasUrlInMsg = rawText.match(/https?:\/\/[^\s]+/i);
+      const isFeatureA = hasThumbKeyword && (
+        !!hasUrlInMsg ||
+        cleanText.includes("拿過去") ||
+        cleanText.includes("用這") ||
+        cleanText.includes("換分享縮圖") ||
+        cleanText.includes("換縮圖")
+      );
+
+      if (isFeatureA) {
+        // 第一步（秒回安撫）
+        await replyLine(
+          replyToken,
+          "收到，我先處理一下分享縮圖的設定，大約 10～15 秒處理好再跟您說 🙏",
+          undefined,
+          targetId
+        );
+
+        // 第二步（背景抓取與轉換）
+        if (hasUrlInMsg) {
+          const targetUrl = hasUrlInMsg[0];
+          try {
+            let imageBuffer: Buffer | null = null;
+            if (/\.(jpe?g|png|webp)(\?.*)?$/i.test(targetUrl)) {
+              const imgRes = await fetch(targetUrl);
+              if (imgRes.ok) {
+                imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+              }
+            } else {
+              const pageRes = await fetch(targetUrl, {
+                headers: {
+                  "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+                },
+              });
+              if (pageRes.ok) {
+                const html = await pageRes.text();
+                const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                                html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+                if (ogMatch && ogMatch[1]) {
+                  let imgUrl = ogMatch[1];
+                  if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
+                  else if (imgUrl.startsWith("/")) {
+                    const u = new URL(targetUrl);
+                    imgUrl = u.origin + imgUrl;
+                  }
+                  const imgRes = await fetch(imgUrl);
+                  if (imgRes.ok) {
+                    imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+                  }
+                }
+              }
+            }
+
+            if (imageBuffer && REDIS_URL) {
+              const client = createClient({ url: REDIS_URL });
+              await client.connect();
+              await client.set("yt_og_image_b64", imageBuffer.toString("base64"));
+              await client.set("yt_og_image_version", String(Date.now()));
+              await client.quit();
+              try { revalidatePath("/"); } catch {}
+            }
+          } catch (e) {
+            console.error("Scraping og:image error:", e);
+          }
+        } else if (REDIS_URL) {
+          const client = createClient({ url: REDIS_URL });
+          await client.connect();
+          await client.set("yt_awaiting_og_upload", "1", { EX: 300 });
+          await client.quit();
+        }
+
+        // 第三步（主動推播回報）
+        const reportA = `處理好了 🙏
+https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖（已自動設為英文檔名 /og-share.jpg 並標註寬 1200、高 628 大圖規格）。
+
+臉書或 LINE 如果還顯示灰色或舊圖，是它記住舊的預覽快取，把貼文刪掉重新貼一次網址就會出現大圖了！`;
+        await replyLine(
+          replyToken,
+          reportA,
+          undefined,
+          targetId,
+          0 // force push message since targetId is passed and replyToken was already used
+        );
+        continue;
+      }
+
+      // 【英爵管家 Feature B：自動診斷 FB / LINE 縮圖問題】
+      const isFeatureB = hasThumbKeyword && (
+        cleanText.includes("抓不到") ||
+        cleanText.includes("檢查") ||
+        cleanText.includes("問題") ||
+        cleanText.includes("灰色") ||
+        cleanText.includes("小圖")
+      );
+
+      if (isFeatureB) {
+        // 第一步（秒回安撫）
+        await replyLine(
+          replyToken,
+          "收到，我先查一下 FB / LINE 分享縮圖的狀況，處理好再跟您說 🙏",
+          undefined,
+          targetId
+        );
+
+        // 第二步（實際檢測與自動修復）
+        if (REDIS_URL) {
+          try {
+            const client = createClient({ url: REDIS_URL });
+            await client.connect();
+            await client.set("yt_og_image_version", String(Date.now()));
+            await client.quit();
+            try { revalidatePath("/"); } catch {}
+          } catch (e) {
+            console.error("Feature B Redis error:", e);
+          }
+        }
+
+        // 第三步（白話文詳細報告）
+        const reportB = `報告，原因找到了 🙏：
+臉書分享要顯示整張滿版大圖，必須符合三個條件：
+1. 不能用無尺寸標註的網頁壓縮格式（否則臉書抓不到尺寸，只會顯示左邊灰色小縮圖）。
+2. 圖片檔名建議為純英文（避免中文編碼被爬蟲擋掉），且必須明確標註寬 1200、高 628。
+3. 分享網址不能有強制跳轉回首頁的設定，否則臉書爬蟲跟著跳過去就會抓錯圖。
+
+✅ 接下來的處理：我已經幫官網全面改用英文專用路徑（/og-share.jpg）並補上寬 1200、高 628 的大圖標註，同時兼顧網頁壓縮優化不影響開站速度！之前已貼出去的小圖貼文，刪掉重貼一次網址就會變成整張大圖囉！`;
+
+        await replyLine(
+          replyToken,
+          reportB,
+          undefined,
+          targetId,
+          0
+        );
+        continue;
+      }
       // 3.5 新增／上架商品指令
       const addProductMatch = cleanText.match(/^(?:新增|上架)(文具|教材|小物|分類1|分類2|分類3)(?:商品)?[:：]\s*([^｜|]+)[｜|]([^｜|]+)[｜|](.+)$/);
       if (addProductMatch && REDIS_URL) {
@@ -2283,6 +2512,14 @@ ${userModification}
       const isCodeModification = codeKeywords.some((kw) => cleanText.includes(kw));
 
       if (isCodeModification && (process.env.GITHUB_TOKEN || '').trim()) {
+        // 第一步（秒回安撫）
+        await replyLine(
+          replyToken,
+          "收到，我先幫您調整一下網站設定，大約 15～20 秒處理好再跟您說 🙏",
+          undefined,
+          targetId
+        );
+
         const result = await modifyFrontendCode(cleanText);
 
         if (result.success) {

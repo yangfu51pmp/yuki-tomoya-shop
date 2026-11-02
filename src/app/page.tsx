@@ -17,6 +17,8 @@ export default function HomePage() {
   const [siteHeroImage, setSiteHeroImage] = useState(""); // 新背景圖
 
   // 動態綁定影片區塊
+  const [videoUrls, setVideoUrls] = useState<string[]>(['/preview-clip-1.mp4', '/preview-clip-2.mp4', '/preview-clip-3.mp4']);
+  const [activeCategoryModal, setActiveCategoryModal] = useState<number | null>(null);
   const [sitePromoVideo, setSitePromoVideo] = useState("https://assets.mixkit.co/videos/preview/mixkit-pouring-coffee-into-a-cup-41545-large.mp4");
   const [sitePromoVideoTitle, setSitePromoVideoTitle] = useState("FEATURED VIDEO ｜ ユキ&トモヤ 日本現場連線實拍");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,9 +117,18 @@ export default function HomePage() {
         const isPreview = new URLSearchParams(window.location.search).get("preview") === "video";
         if (isPreview) {
           setIsPreviewMode(true);
-          if (data?.preview_video) setSitePromoVideo(data.preview_video);
+          if (data?.preview_video_urls?.length > 0) {
+            setVideoUrls(data.preview_video_urls);
+            setSitePromoVideo(data.preview_video_urls[0]);
+          } else if (data?.preview_video) {
+            setSitePromoVideo(data.preview_video);
+          }
           if (data?.preview_ai_script) setAiScript(data.preview_ai_script);
         } else {
+          if (data?.video_urls?.length > 0) {
+            setVideoUrls(data.video_urls);
+            setSitePromoVideo(data.video_urls[0]);
+          }
           if (data?.video_ai_script) setAiScript(data.video_ai_script);
         }
       })
@@ -325,7 +336,7 @@ export default function HomePage() {
                   }
 
                   return (
-                    <AiVideoPlayer videoUrl={sitePromoVideo} aiScript={aiScript} poster={sitePromoPoster || undefined} />
+                    <AiVideoPlayer videoUrl={sitePromoVideo} videoUrls={videoUrls} aiScript={aiScript} poster={sitePromoPoster || undefined} />
                   );
                 }
               })()}
@@ -344,9 +355,13 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {categories.map((item) => (
-              <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-[#6db3e0] flex flex-col group cursor-pointer">
+              <div
+                key={item.id}
+                onClick={() => setActiveCategoryModal(item.id)}
+                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-[#6db3e0] flex flex-col group cursor-pointer"
+              >
                 <div className="h-52 overflow-hidden relative bg-[#F2F2F2]">
                   <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5">
                     <div className="w-7 h-7 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-xs font-extrabold text-[#78C4EC] shadow-sm border border-[#6db3e0]">
@@ -369,29 +384,20 @@ export default function HomePage() {
                     <p className="text-[13px] text-stone-500 leading-relaxed font-medium">{item.desc}</p>
                   </div>
 
-                  <details className="group mt-4 border-t border-slate-100 pt-4">
-                    <summary className="text-sm font-bold text-white bg-[#78C4EC] hover:bg-[#6db3e0] px-4 py-2 rounded-full cursor-pointer list-none flex items-center justify-between shadow-sm transition text-center w-full">
-                      <span className="w-full">✨ 查看本區精選商品（共 {item.products.length} 款） ▾</span>
-                    </summary>
-                    <div className="mt-4 flex flex-col gap-4">
-                      {item.products.map((product) => (
-                        <div key={product.id} className="flex gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-[#6db3e0] transition">
-                          <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-white shadow-sm">
-                            <img src={product.imageUrl || "https://images.unsplash.com/photo-1540340061722-9293d5163008?w=400&q=80"} alt={product.name} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex flex-col flex-1 min-w-0 justify-center">
-                            <h4 className="text-sm font-bold text-stone-700 truncate">{product.name}</h4>
-                            <span className="inline-block self-start mt-1 mb-1 px-2 py-0.5 bg-[#78C4EC] text-white text-[11px] font-bold rounded-sm shadow-sm">{product.price}</span>
-                            <p className="text-[11px] text-stone-500 line-clamp-2">{product.desc}</p>
-                            <a href="https://line.me" target="_blank" rel="noopener noreferrer" className="mt-2 text-[11px] font-bold text-[#78C4EC] hover:text-[#56A8D6] transition">💬 點此用 LINE 詢問／下單此商品 →</a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveCategoryModal(item.id);
+                      }}
+                      className="text-sm font-bold text-white bg-[#78C4EC] hover:bg-[#6db3e0] px-4 py-2.5 rounded-full shadow-sm transition text-center w-full flex items-center justify-center gap-1.5"
+                    >
+                      <span>✨ 查看本區精選商品（共 {item.products.length} 款）</span>
+                    </button>
+                  </div>
 
-                  <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
-                    <span className="text-[13px] font-bold text-[#78C4EC] group-hover:text-[#56A8D6] transition">LINE 傳圖詢價 →</span>
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                    <span className="text-[13px] font-bold text-[#78C4EC] group-hover:text-[#56A8D6] transition">查看商品櫥窗 ↗</span>
                   </div>
                 </div>
               </div>
@@ -513,6 +519,93 @@ export default function HomePage() {
           </div>
         </div>
       )}
+      {/* 8. 第二層商品櫥窗彈出視窗（Modal） */}
+      {activeCategoryModal !== null && (() => {
+        const currentCategory = categories.find((c) => c.id === activeCategoryModal);
+        if (!currentCategory) return null;
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+            onClick={() => setActiveCategoryModal(null)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-[#6db3e0] relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-[#78C4EC] text-white p-5 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
+                    {currentCategory.tag}
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-bold mt-1.5">{currentCategory.title}</h3>
+                </div>
+                <button
+                  onClick={() => setActiveCategoryModal(null)}
+                  className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition text-lg font-bold"
+                  aria-label="關閉"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                <p className="text-sm text-stone-600 font-medium">{currentCategory.desc}</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {currentCategory.products.map((product) => (
+                    <div
+                      key={product.id}
+                      className="bg-slate-50 rounded-2xl p-4 border border-slate-200 hover:border-[#78C4EC] transition flex flex-col shadow-sm"
+                    >
+                      <div className="w-full aspect-square rounded-xl overflow-hidden bg-white mb-3 shadow-inner relative">
+                        <img
+                          src={product.imageUrl || "https://images.unsplash.com/photo-1540340061722-9293d5163008?w=400&q=80"}
+                          alt={product.name}
+                          className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                        />
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h4 className="font-bold text-stone-800 text-sm">{product.name}</h4>
+                            <span className="shrink-0 px-2.5 py-0.5 bg-[#78C4EC] text-white text-xs font-bold rounded-md shadow-sm">
+                              {product.price}
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-500 leading-relaxed mb-4">{product.desc}</p>
+                        </div>
+                        <a
+                          href="https://line.me"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full text-center py-2.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+                        >
+                          💬 點此用 LINE 詢問／下單此商品
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs text-stone-500">
+                <span>共有 {currentCategory.products.length} 款日本嚴選商品</span>
+                <button
+                  onClick={() => setActiveCategoryModal(null)}
+                  className="px-4 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold rounded-lg transition"
+                >
+                  關閉視窗
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
