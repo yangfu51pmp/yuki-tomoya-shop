@@ -9,7 +9,7 @@ export default function HomePage() {
   const [contactOpen, setContactOpen] = useState(false);
 
   // 動態綁定 Redis 的網站主標題、頂部公告與連結
-  const [lineOfficialUrl, setLineOfficialUrl] = useState("https://line.me/R/ti/p/@yuki_tomoya");
+  const [lineOfficialUrl, setLineOfficialUrl] = useState("https://lin.ee/VFh69eyZ");
   const [siteTitle, setSiteTitle] = useState("日本職人好物・安心直送台灣");
   const [siteAnnouncement, setSiteAnnouncement] = useState("✈️ ユキ&トモヤ 日本現地連線代購中！運動裝備・文具教材・保健益生菌・日本直送");
   const [siteAnnouncementUrl, setSiteAnnouncementUrl] = useState("");

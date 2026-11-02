@@ -237,7 +237,7 @@ export async function GET(req: NextRequest) {
         preview_video: preview_video || "",
         preview_ai_script: previewAiScriptToReturn,
         line_video_stitch_queue: line_video_stitch_queue ? JSON.parse(line_video_stitch_queue) : [],
-        line_official_url: yt_line_official_url || "https://line.me/R/ti/p/@yuki_tomoya",
+        line_official_url: yt_line_official_url || "https://lin.ee/VFh69eyZ",
       },
       {
         headers: {
@@ -254,7 +254,7 @@ export async function GET(req: NextRequest) {
       site_announcement: "",
       site_announcement_url: "",
       site_hero_image: "",
-      line_official_url: "https://line.me/R/ti/p/@yuki_tomoya",
+      line_official_url: "https://lin.ee/VFh69eyZ",
     });
   }
 }
