@@ -1598,12 +1598,43 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
 
       const rawText = event.message.text.trim();
       const isGroup = event.source?.type === 'group' || event.source?.type === 'room';
+      const isAdminMention = rawText.includes('@ユキ&トモヤ管理助手') || rawText.includes('@管理助手');
 
-      // Strictly require @ユキ&トモヤ管理助手 in group chats!
-      if (isGroup && !rawText.includes('@ユキ&トモヤ管理助手') && !rawText.includes('@管理助手')) {
-        continue; // Ignore normal group chat messages completely
+      // 嚴格區分「一般客人客服模式」與「@ユキ&トモヤ管理助手 管理員模式」
+      if (!isAdminMention) {
+        // 群組中未 @ 管理助手，完全不處理
+        if (isGroup) {
+          continue;
+        }
+
+        // 1對1 私訊（event.source.type === "user"）且未 @ 管理助手：一般客人模式
+        const isGreetingOrInquiry = /(?:你好|您好|哈囉|hello|hi|嗨|早安|午安|晚安|在嗎|請問|代購|怎麼買|購買|如何買|想買|諮詢|詢問)/i.test(rawText);
+        if (isGreetingOrInquiry) {
+          let customerWelcomeMsg = "";
+          if (REDIS_URL) {
+            try {
+              const client = createClient({ url: REDIS_URL });
+              await client.connect();
+              customerWelcomeMsg = (await client.get("yt_customer_welcome_msg")) || "";
+              await client.quit();
+            } catch (e) {
+              console.error("Read yt_customer_welcome_msg error:", e);
+            }
+          }
+
+          if (!customerWelcomeMsg) {
+            customerWelcomeMsg = "您好！歡迎來到 ユキ&トモヤ 日本選物代購 🇯🇵✨\n\n我們提供日本棒壘運動裝備、KUMON 益智教具文具、家庭保健益生菌與日本仙台現地連線好物。\n\n💬 請問今天想找哪一類日本商品呢？您可以直接傳送「商品照片、網址或名稱」，我們會由專人盡快為您報價與解答喔！😊";
+          }
+
+          await replyLine(replyToken, customerWelcomeMsg, undefined, targetId, startTime);
+          continue;
+        }
+
+        // 若客人在 1對1 私訊傳送其他具體商品問題（非單純打招呼），則不亂回罐頭訊息，讓店家可以在 LINE 後台用真人一對一回覆
+        continue;
       }
 
+      // 只有當包含 @ユキ&トモヤ管理助手（或 @管理助手）時，才進入「網站管理員管家模式」
       // Strip the @ mention prefix so command matching works cleanly!
       let cleanText = rawText
         .replace(/@ユキ&トモヤ管理助手/g, '')
@@ -2034,6 +2065,27 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
             `🤖 ユキ&トモヤ管理助手\n已成功將公告連結綁定為：\n${targetUrl}\n\n官網已即時生效：\n${SITE_URL}`,
             screenshot
           , targetId, startTime);
+          continue;
+        }
+      }
+
+      // 6.5 客人歡迎詞修改（Redis 高速通道，支援「歡迎詞改為：...」、「設定歡迎詞：...」）
+      const welcomeMsgMatch = cleanText.match(/(?:修改歡迎詞|改歡迎詞|設定歡迎詞|歡迎詞(?:更改為?|修改為?|設定?為|改成|改為|換成))[：:\s]*([\s\S]+)/);
+      if (welcomeMsgMatch && REDIS_URL) {
+        const newWelcomeMsg = welcomeMsgMatch[1].replace(/^[「『"“]|["”』」]$/g, "").trim();
+        if (newWelcomeMsg) {
+          const client = createClient({ url: REDIS_URL });
+          await client.connect();
+          await client.set("yt_customer_welcome_msg", newWelcomeMsg);
+          await client.quit();
+
+          await replyLine(
+            replyToken,
+            `✅ 已更新客人專屬歡迎詞！\n\n目前設定內容為：\n「${newWelcomeMsg}」\n\n（當客人在 LINE 留言打招呼時，就會收到這段歡迎訊息囉！）`,
+            undefined,
+            targetId,
+            startTime
+          );
           continue;
         }
       }
