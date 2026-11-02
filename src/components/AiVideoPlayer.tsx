@@ -198,10 +198,11 @@ export default function AiVideoPlayer({
 
   const clips = (videoUrls && videoUrls.length > 0) ? videoUrls : (videoUrl ? [videoUrl] : []);
   const [currentClipIndex, setCurrentClipIndex] = useState(0);
-  const [clipDurations, setClipDurations] = useState<number[]>([]);
+  const [clipDurations, setClipDurations] = useState<number[]>(() => new Array(clips.length).fill(10));
+  const totalDuration = (clipDurations.length > 0 ? clipDurations : new Array(clips.length).fill(10)).reduce((acc, d) => acc + (d || 10), 0) || 30;
   const [globalTime, setGlobalTime] = useState(0);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
   let resolvedScript = aiScript;
 
@@ -218,7 +219,7 @@ export default function AiVideoPlayer({
     resolvedScript = aiScript;
   } else {
     // Dynamic fallback based on video duration
-    const currentDuration = videoRef.current?.duration || 0;
+    const currentDuration = videoRefs.current[currentClipIndex]?.duration || 0;
 
     // Only use COACH_PRAISE_39S_SCRIPT if aiScript explicitly matched Coach Kusano.
     // Otherwise fallback to BRAND_30S_STITCHED_SCRIPT
@@ -235,15 +236,37 @@ export default function AiVideoPlayer({
     }
   }
 
+  // 若字幕的最大 end 秒數與實際 totalDuration 落差超過 5 秒，自動按比例縮放字幕時間軸以貼合實際片長
+  if (resolvedScript && Array.isArray(resolvedScript.subtitles) && resolvedScript.subtitles.length > 0 && totalDuration > 0) {
+    const maxEnd = Math.max(...resolvedScript.subtitles.map((s: any) => s.end || 0));
+    if (maxEnd > 0 && Math.abs(maxEnd - totalDuration) > 5) {
+      const ratio = totalDuration / maxEnd;
+      resolvedScript = {
+        ...resolvedScript,
+        subtitles: resolvedScript.subtitles.map((s: any) => ({
+          ...s,
+          start: Math.round(s.start * ratio * 10) / 10,
+          end: Math.round(s.end * ratio * 10) / 10
+        }))
+      };
+    }
+  }
+
 
   const rawVideoArrayBufferRefs = useRef<(ArrayBuffer | null)[]>([]);
   const decodedAudioBufferRefs = useRef<(AudioBuffer | null)[]>([]);
 
+  // Preload and standby ready next clip
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
+    const nextIdx = currentClipIndex + 1;
+    if (nextIdx < clips.length) {
+      const nextV = videoRefs.current[nextIdx];
+      if (nextV) {
+        nextV.currentTime = 0;
+        nextV.pause();
+      }
     }
-  }, [activeClipUrl]);
+  }, [currentClipIndex, clips.length]);
 
   useEffect(() => {
     rawVideoArrayBufferRefs.current = new Array(clips.length).fill(null);
@@ -282,11 +305,13 @@ export default function AiVideoPlayer({
   const [hasStarted, setHasStarted] = useState(false);
 
   const unlockAudio = useCallback(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = false;
-      videoRef.current.volume = 1.0;
-      setIsVideoMuted(false);
-    }
+    videoRefs.current.forEach(v => {
+      if (v) {
+        v.muted = false;
+        v.volume = 1.0;
+      }
+    });
+    setIsVideoMuted(false);
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!audioContextRef.current && AudioContextClass) {
@@ -398,30 +423,47 @@ export default function AiVideoPlayer({
     }
   }, [soundEnabled]);
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const cTime = videoRef.current.currentTime;
-      const now = Date.now();
+  const handleClipTimeUpdate = (idx: number) => {
+    const v = videoRefs.current[idx];
+    if (!v || idx !== currentClipIndex) return;
 
-      if (now - lastUpdateRef.current > 120) {
-        setCurrentTime(cTime);
-    const pastDuration = clipDurations.slice(0, currentClipIndex).reduce((a, b) => a + b, 0);
-    setGlobalTime(pastDuration + cTime);
-        lastUpdateRef.current = now;
+    const cTime = v.currentTime;
+    const vDuration = v.duration || clipDurations[idx] || 10;
+    const now = Date.now();
+
+    // Zero-latency seamless clip switch when remaining time <= 0.08s
+    if (vDuration > 0 && vDuration - cTime <= 0.08) {
+      if (idx < clips.length - 1) {
+        const nextIdx = idx + 1;
+        const nextV = videoRefs.current[nextIdx];
+        if (nextV) {
+          nextV.currentTime = 0;
+          nextV.play().catch(() => {});
+        }
+        setCurrentClipIndex(nextIdx);
+        return;
       }
+    }
+
+    if (now - lastUpdateRef.current > 60) {
+      setCurrentTime(cTime);
+      const pastDuration = clipDurations.slice(0, idx).reduce((a, b) => a + (b || 10), 0);
+      const curGlobal = pastDuration + cTime;
+      setGlobalTime(curGlobal);
+      lastUpdateRef.current = now;
 
       // Reset sounds if video loops or restarts
-      if (cTime < 0.5) {
+      if (curGlobal < 0.5) {
         playedSfxRef.current.clear();
       }
 
-      // AI Gap Cutting & Auto Zoom
+      // AI Gap Cutting & Auto Zoom based on globalTime
       if (jumpCutEnabled && resolvedScript?.speechSegments && resolvedScript.speechSegments.length > 0) {
         const segments = resolvedScript.speechSegments;
         let inSegment = false;
         for (let i = 0; i < segments.length; i++) {
           const seg = segments[i];
-          if (cTime >= seg.start && cTime <= seg.end) {
+          if (curGlobal >= seg.start && curGlobal <= seg.end) {
             inSegment = true;
             setCurrentSpeechZoom(seg.zoomLevel);
             break;
@@ -429,9 +471,9 @@ export default function AiVideoPlayer({
         }
 
         if (!inSegment && now - lastSeekRef.current > 800) {
-          const nextSeg = segments.find(s => s.start > cTime);
+          const nextSeg = segments.find(s => s.start > curGlobal);
           if (nextSeg) {
-            videoRef.current.currentTime = nextSeg.start;
+            handleSeekGlobal(nextSeg.start);
             lastSeekRef.current = now;
           }
         }
@@ -440,7 +482,7 @@ export default function AiVideoPlayer({
       }
 
       if (effectEnabled && resolvedScript) {
-        const events = allEvents.filter(e => cTime >= e.start && cTime <= e.end);
+        const events = allEvents.filter(e => curGlobal >= e.start && curGlobal <= e.end);
         events.forEach(evt => {
           if (evt.sfx && !playedSfxRef.current.has(evt.id)) {
             playedSfxRef.current.add(evt.id);
@@ -449,6 +491,40 @@ export default function AiVideoPlayer({
         });
       }
     }
+  };
+
+  const handleSeekGlobal = (targetGlobalTime: number) => {
+    let accumulated = 0;
+    let targetClipIndex = 0;
+    let offsetSeconds = 0;
+
+    for (let i = 0; i < clips.length; i++) {
+      const dur = clipDurations[i] || 10;
+      if (targetGlobalTime <= accumulated + dur || i === clips.length - 1) {
+        targetClipIndex = i;
+        offsetSeconds = Math.max(0, targetGlobalTime - accumulated);
+        break;
+      }
+      accumulated += dur;
+    }
+
+    videoRefs.current.forEach((v, idx) => {
+      if (v) {
+        if (idx === targetClipIndex) {
+          v.currentTime = offsetSeconds;
+          if (isPlaying) {
+            v.play().catch(() => {});
+          }
+        } else {
+          v.pause();
+          v.currentTime = 0;
+        }
+      }
+    });
+
+    setCurrentClipIndex(targetClipIndex);
+    setCurrentTime(offsetSeconds);
+    setGlobalTime(targetGlobalTime);
   };
 
   const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
@@ -474,12 +550,12 @@ export default function AiVideoPlayer({
   }
 
   const coverEnd = 3.2; // 0.0 - 3.2s
-  const outroStart = (videoRef.current?.duration || 39) > 10 ? (videoRef.current?.duration || 39) - 3.5 : 999;
+  const outroStart = totalDuration > 10 ? totalDuration - 3.5 : 999;
 
-  let rawActiveEvents = allEvents.filter((e) => currentTime >= e.start && currentTime <= e.end);
+  let rawActiveEvents = allEvents.filter((e) => globalTime >= e.start && globalTime <= e.end);
 
   // 1. Strict Intro / Outro Isolation
-  if (currentTime <= coverEnd + 0.2 || currentTime >= outroStart - 0.2) {
+  if (globalTime <= coverEnd + 0.2 || globalTime >= outroStart - 0.2) {
       rawActiveEvents = [];
   }
 
@@ -499,10 +575,10 @@ export default function AiVideoPlayer({
   }
 
   const activeEffects = {
-    cover: cardsVisible !== false && resolvedScript?.cover && currentTime >= 0 && currentTime <= coverEnd,
-    subtitle: resolvedScript?.subtitles?.find((s) => currentTime >= s.start && currentTime <= s.end),
+    cover: cardsVisible !== false && resolvedScript?.cover && globalTime >= 0 && globalTime <= coverEnd,
+    subtitle: resolvedScript?.subtitles?.find((s) => globalTime >= s.start && globalTime <= s.end),
     events: cardsVisible !== false ? finalActiveEvents : [],
-    outro: cardsVisible !== false && resolvedScript?.outro && currentTime >= outroStart,
+    outro: cardsVisible !== false && resolvedScript?.outro && globalTime >= outroStart,
   };
 
   const hasZoomEvent = activeEffects.events.some(e => e.zoom === true || e.type === 'big_impact');
@@ -557,14 +633,14 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
   };
 
   const exportVideo = useCallback(async () => {
-    if (!videoRef.current || !containerRef.current) return;
+    const activeExportV = videoRefs.current[0] || videoRefs.current[currentClipIndex]; if (!activeExportV || !containerRef.current) return;
 
     setIsExporting(true);
     setExportProgress(0);
 
     try {
-        const v = videoRef.current;
-        v.pause();
+        const v = activeExportV;
+        videoRefs.current.forEach(item => item?.pause());
 
         const totalDuration = clipDurations.reduce((a, b) => a + b, 0) || v.duration || 30;
 
@@ -983,61 +1059,102 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
         // Ignore clicks on buttons/inputs
         const target = e.target as HTMLElement;
         if (target.closest('button') || target.tagName === 'BUTTON' || target.tagName === 'INPUT') return;
-        const v = videoRef.current;
+        const v = videoRefs.current[currentClipIndex];
         if (v && hasStarted) {
-          if (v.paused) v.play().catch(() => { v.muted = true; v.play(); });
-          else v.pause();
+          if (v.paused) {
+            v.play().catch(() => { v.muted = true; v.play(); });
+            setIsPlaying(true);
+          } else {
+            v.pause();
+            setIsPlaying(false);
+          }
         }
       }} className={`${containerClass} ${isFullscreen && isRotated ? 'rotate-90 w-[100dvh] h-[100vw] origin-center' : ''}`} ref={containerRef}>
-        <video
-          key={activeClipUrl}
-          ref={videoRef}
-          src={activeClipUrl}
-          autoPlay
-          playsInline
-          controls={false}
-          controlsList={!isPreviewMode ? "nodownload" : undefined}
-          onContextMenu={!isPreviewMode ? (e) => e.preventDefault() : undefined}
-          onTimeUpdate={handleTimeUpdate}
-          onPlay={() => { setIsPlaying(true); setHasStarted(true); }}
-          onPause={() => setIsPlaying(false)}
-          onLoadedMetadata={(e) => {
-            const duration = e.currentTarget.duration;
-            setClipDurations(prev => {
-                const updated = [...prev];
-                updated[currentClipIndex] = duration;
-                return updated;
-            });
-            handleLoadedMetadata(e as any);
-          }}
-          onEnded={() => {
-            if (currentClipIndex < clips.length - 1) {
-              setCurrentClipIndex(prev => prev + 1);
-            } else {
-              if (videoRef.current) {
-                videoRef.current.currentTime = 0;
-                setCurrentClipIndex(0);
-                videoRef.current.play();
-              }
-            }
-          }}
-          className={videoClass}
-        />
+        {clips.map((clipUrl, idx) => {
+          const isCurrent = idx === currentClipIndex;
+          const trackClass = isCurrent
+            ? "w-full h-full object-cover opacity-100 transition-opacity duration-150 z-10 " + scaleClass
+            : "w-full h-full object-cover opacity-0 pointer-events-none absolute inset-0 z-0 " + scaleClass;
+
+          return (
+            <video
+              key={idx}
+              ref={(el) => { videoRefs.current[idx] = el; }}
+              src={clipUrl}
+              preload="auto"
+              autoPlay={idx === 0}
+              playsInline
+              controls={false}
+              controlsList={!isPreviewMode ? "nodownload" : undefined}
+              onContextMenu={!isPreviewMode ? (e) => e.preventDefault() : undefined}
+              onTimeUpdate={() => handleClipTimeUpdate(idx)}
+              onPlay={() => {
+                if (idx === currentClipIndex) {
+                  setIsPlaying(true);
+                  setHasStarted(true);
+                }
+              }}
+              onPause={() => {
+                if (idx === currentClipIndex) {
+                  setIsPlaying(false);
+                }
+              }}
+              onLoadedMetadata={(e) => {
+                const duration = e.currentTarget.duration;
+                setClipDurations((prev) => {
+                  const updated = [...prev];
+                  updated[idx] = duration;
+                  return updated;
+                });
+                if (idx === 0) {
+                  handleLoadedMetadata(e as any);
+                }
+              }}
+              onEnded={() => {
+                if (idx === currentClipIndex) {
+                  if (currentClipIndex < clips.length - 1) {
+                    const nextIdx = currentClipIndex + 1;
+                    const nextV = videoRefs.current[nextIdx];
+                    if (nextV) {
+                      nextV.currentTime = 0;
+                      nextV.play().catch(() => {});
+                    }
+                    setCurrentClipIndex(nextIdx);
+                  } else {
+                    // Loop or pause at end: return to 0 and pause
+                    videoRefs.current.forEach((v, i) => {
+                      if (v) {
+                        v.currentTime = 0;
+                        v.pause();
+                      }
+                    });
+                    setCurrentClipIndex(0);
+                    setIsPlaying(false);
+                  }
+                }
+              }}
+              className={trackClass}
+            />
+          );
+        })}
 
         {/* Playback Overlays */}
         {!hasStarted && !isExporting && (
           <div className="absolute inset-0 z-40 pointer-events-auto flex items-center justify-center bg-black/40"
                onClick={() => {
-                 const v = videoRef.current;
+                 const v = videoRefs.current[currentClipIndex];
                  if (v) {
                    v.muted = false;
                    v.volume = 1.0;
                    if (v.paused) {
                      v.play().catch(() => { v.muted = true; v.play(); });
+                     setIsPlaying(true);
                    } else {
                      v.pause();
+                     setIsPlaying(false);
                    }
                  }
+                 setHasStarted(true);
                }}
           >
             <div className="bg-[#78C4EC] text-white px-6 py-3 rounded-full font-extrabold shadow-2xl flex items-center gap-2 hover:bg-[#6db3e0] transition transform hover:scale-105 cursor-pointer text-lg">
@@ -1051,8 +1168,11 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
             <div className="pointer-events-auto bg-black/50 text-white p-4 rounded-full backdrop-blur-sm cursor-pointer hover:bg-black/70 transition shadow-xl border border-white/20"
                  onClick={(e) => {
                    e.stopPropagation();
-                   const v = videoRef.current;
-                   if (v && v.paused) v.play().catch(() => { v.muted = true; v.play(); });
+                   const v = videoRefs.current[currentClipIndex];
+                   if (v && v.paused) {
+                     v.play().catch(() => { v.muted = true; v.play(); });
+                     setIsPlaying(true);
+                   }
                  }}
             >
               <div className="flex items-center gap-2 text-lg font-bold pr-2">
@@ -1068,10 +1188,15 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
              <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  const v = videoRef.current;
+                  const v = videoRefs.current[currentClipIndex];
                   if (v) {
-                    if (v.paused) v.play().catch(() => { v.muted = true; v.play(); });
-                    else v.pause();
+                    if (v.paused) {
+                      v.play().catch(() => { v.muted = true; v.play(); });
+                      setIsPlaying(true);
+                    } else {
+                      v.pause();
+                      setIsPlaying(false);
+                    }
                   }
                 }}
                 className="hover:text-[#78C4EC] transition font-bold shrink-0"
@@ -1083,30 +1208,29 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                <input
                  type="range"
                  min={0}
-                 max={videoRef.current?.duration || 71}
+                 max={totalDuration}
                  step={0.1}
-                 value={currentTime}
+                 value={globalTime}
                  onChange={(e) => {
                    const t = parseFloat(e.target.value);
-                   if (videoRef.current) videoRef.current.currentTime = t;
-                   setCurrentTime(t);
+                   handleSeekGlobal(t);
                  }}
                  className="flex-1 accent-sky-400 h-1 cursor-pointer"
                />
                <span className="font-bold tracking-wider shrink-0 text-[10px] sm:text-xs">
-                 {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 71)}
+                 {formatTime(globalTime)} / {formatTime(totalDuration)}
                </span>
              </div>
 
              <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  const v = videoRef.current;
-                  if (v) {
-                    v.muted = !v.muted;
-                    setIsVideoMuted(v.muted);
-                    setSoundEnabled(!v.muted);
-                  }
+                  const nextMuted = !isVideoMuted;
+                  videoRefs.current.forEach((v) => {
+                    if (v) v.muted = nextMuted;
+                  });
+                  setIsVideoMuted(nextMuted);
+                  setSoundEnabled(!nextMuted);
                 }}
                 className="hover:text-[#78C4EC] transition font-bold shrink-0"
              >
@@ -1375,10 +1499,15 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                   <button
                     onClick={() => {
                       unlockAudio();
-                      const v = videoRef.current;
+                      const v = videoRefs.current[currentClipIndex];
                       if (v) {
-                        if (v.paused) v.play().catch(() => { v.muted = true; v.play(); });
-                        else v.pause();
+                        if (v.paused) {
+                          v.play().catch(() => { v.muted = true; v.play(); });
+                          setIsPlaying(true);
+                        } else {
+                          v.pause();
+                          setIsPlaying(false);
+                        }
                       }
                     }}
                     disabled={isExporting}
@@ -1390,11 +1519,12 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                   <button
                     onClick={() => {
                       unlockAudio();
-                      const v = videoRef.current;
-                      if (v) {
-                        v.muted = !v.muted;
-                        setIsVideoMuted(v.muted);
-                      }
+                      const nextMuted = !isVideoMuted;
+                      videoRefs.current.forEach((v) => {
+                        if (v) v.muted = nextMuted;
+                      });
+                      setIsVideoMuted(nextMuted);
+                      setSoundEnabled(!nextMuted);
                     }}
                     disabled={isExporting}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
@@ -1447,7 +1577,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v7.0)
+                      🎬 匯出有聲 MP4 影片 (v7.3｜已串連 {clips.length} 段・共 {Math.round(totalDuration)} 秒)
                     </button>
                   )}
                 </div>
