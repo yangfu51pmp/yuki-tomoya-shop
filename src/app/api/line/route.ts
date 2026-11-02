@@ -1598,7 +1598,7 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
 
       const rawText = event.message.text.trim();
       const isGroup = event.source?.type === 'group' || event.source?.type === 'room';
-      const isAdminMention = rawText.includes('@ユキ&トモヤ管理助手') || rawText.includes('@管理助手');
+      const isAdminMention = rawText.includes('@ユキ&トモヤ管理助手') || rawText.includes('@管理助手') || rawText.includes('@ユキ&トモヤ');
 
       // 嚴格區分「一般客人客服模式」與「@ユキ&トモヤ管理助手 管理員模式」
       if (!isAdminMention) {
@@ -1623,7 +1623,7 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
           }
 
           if (!customerWelcomeMsg) {
-            customerWelcomeMsg = "您好！歡迎來到 ユキ&トモヤ 日本選物代購 🇯🇵✨\n\n我們提供日本棒壘運動裝備、KUMON 益智教具文具、家庭保健益生菌與日本仙台現地連線好物。\n\n💬 請問今天想找哪一類日本商品呢？您可以直接傳送「商品照片、網址或名稱」，我們會由專人盡快為您報價與解答喔！😊";
+            customerWelcomeMsg = "您好！歡迎來到 ユキ&トモヤ｜精緻嚴選｜日本代購 🇯🇵✨\n\n我們提供日本棒壘運動裝備、KUMON 益智教具文具、家庭保健益生菌與日本仙台現地連線好物。\n\n💬 請問今天想找哪一類日本商品呢？您可以直接傳送「商品照片、連結或名稱」，我們會盡快由專人為您報價與解答喔！😊";
           }
 
           await replyLine(replyToken, customerWelcomeMsg, undefined, targetId, startTime);
@@ -1639,8 +1639,28 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
       let cleanText = rawText
         .replace(/@ユキ&トモヤ管理助手/g, '')
         .replace(/@管理助手/g, '')
+        .replace(/@ユキ&トモヤ/g, '')
         .replace(/^@\S+\s*/, '')
         .trim();
+
+      const welcomeMsgMatch = cleanText.match(/^(?:自動回覆|歡迎詞)改為[：:\s]*([\s\S]+)/i);
+      if (welcomeMsgMatch) {
+        const newWelcomeMsg = welcomeMsgMatch[1].trim();
+        if (REDIS_URL) {
+          const client = createClient({ url: REDIS_URL });
+          await client.connect();
+          await client.set("yt_customer_welcome_msg", newWelcomeMsg);
+          await client.quit();
+          await replyLine(
+            replyToken,
+            `✅ 已成功更新客人自動回覆詞！\n\n目前設定為：\n「${newWelcomeMsg}」`,
+            undefined,
+            targetId,
+            startTime
+          );
+        }
+        continue;
+      }
 
       // 1.5 Stitch commands (highest priority)
       if (cleanText.includes('開始串連') || cleanText.includes('串連模式')) {
@@ -2032,22 +2052,6 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
         continue;
       }
 
-      // 5. 稱讚與問候互動
-      const praiseKeywords = ["很棒", "讚", "太棒", "辛苦", "謝謝", "感謝", "你好", "哈囉", "早安", "晚安", "厲害", "棒棒", "喜歡你"];
-      if (
-        praiseKeywords.some((kw) => cleanText.includes(kw)) &&
-        cleanText.length < 15 &&
-        !cleanText.includes("改") &&
-        !cleanText.includes("換") &&
-        !cleanText.includes("http")
-      ) {
-        await replyLine(
-          replyToken,
-          "謝謝誇獎！我隨時在線待命，有任何門市公告、標題文字、排版樣式或按鈕顏色要調整，隨時 @ 我交代即可 😊⚾☕"
-        , undefined, targetId, startTime);
-        continue;
-      }
-
       // 6. 網址綁定公告（Redis 高速通道，0.1 秒生效）
       const urlMatch = rawText.match(/https?:\/\/[^\s]+/i);
       if (urlMatch && (cleanText.includes("連結") || cleanText.includes("公告") || cleanText.includes("網址") || cleanText.includes("直播"))) {
@@ -2069,26 +2073,6 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
         }
       }
 
-      // 6.5 客人歡迎詞修改（Redis 高速通道，支援「歡迎詞改為：...」、「設定歡迎詞：...」）
-      const welcomeMsgMatch = cleanText.match(/(?:修改歡迎詞|改歡迎詞|設定歡迎詞|歡迎詞(?:更改為?|修改為?|設定?為|改成|改為|換成))[：:\s]*([\s\S]+)/);
-      if (welcomeMsgMatch && REDIS_URL) {
-        const newWelcomeMsg = welcomeMsgMatch[1].replace(/^[「『"“]|["”』」]$/g, "").trim();
-        if (newWelcomeMsg) {
-          const client = createClient({ url: REDIS_URL });
-          await client.connect();
-          await client.set("yt_customer_welcome_msg", newWelcomeMsg);
-          await client.quit();
-
-          await replyLine(
-            replyToken,
-            `✅ 已更新客人專屬歡迎詞！\n\n目前設定內容為：\n「${newWelcomeMsg}」\n\n（當客人在 LINE 留言打招呼時，就會收到這段歡迎訊息囉！）`,
-            undefined,
-            targetId,
-            startTime
-          );
-          continue;
-        }
-      }
 
       // 7. 門市公告修改（Redis 高速通道，支援「公告改為...」、「把公告換成...」）
       const noticeMatch = cleanText.match(/(?:修改公告|改公告|公告(?:文字|內容)?(?:更改為?|修改為?|設定?為|改成|改為|換成))[：:\s]*(.+)/);
