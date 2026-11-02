@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
       site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation,
       cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8,
       cat_products_1, cat_products_2, cat_products_3, video_ai_script, preview_video, preview_ai_script,
-      preview_video_data, published_video_data, line_video_stitch_queue
+      preview_video_data, published_video_data, line_video_stitch_queue, yt_line_official_url
     ] = await Promise.all([
       client.get("yt_site_title"),
       client.get("yt_site_announcement"),
@@ -176,6 +176,7 @@ export async function GET(req: NextRequest) {
       client.get("preview_video_data"),
       client.get("published_video_data"),
       client.get("line_video_stitch_queue"),
+      client.get("yt_line_official_url"),
     ]);
     await client.quit();
 
@@ -236,6 +237,7 @@ export async function GET(req: NextRequest) {
         preview_video: preview_video || "",
         preview_ai_script: previewAiScriptToReturn,
         line_video_stitch_queue: line_video_stitch_queue ? JSON.parse(line_video_stitch_queue) : [],
+        line_official_url: yt_line_official_url || "https://lin.ee/VFh69eyZ",
       },
       {
         headers: {
@@ -252,6 +254,7 @@ export async function GET(req: NextRequest) {
       site_announcement: "",
       site_announcement_url: "",
       site_hero_image: "",
+      line_official_url: "https://lin.ee/VFh69eyZ",
     });
   }
 }
@@ -716,7 +719,10 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
     return { success: false, message: "尚未在 Vercel 設定 GITHUB_TOKEN。" };
   }
 
-  const getUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx`;
+  // 智能判斷目標檔案：若指令涉及「影片、播放器、自動播放、字幕、字卡、控制框」，則修改 src/components/AiVideoPlayer.tsx，否則修改 src/app/page.tsx
+  const isVideoRelated = /(?:影片|播放器|自動播放|字幕|字卡|控制框|聲音|靜音)/.test(userInstruction);
+  const targetFilePath = isVideoRelated ? "src/components/AiVideoPlayer.tsx" : "src/app/page.tsx";
+  const getUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/${targetFilePath}`;
 
   const getRes = await fetch(getUrl, {
     headers: {
@@ -747,16 +753,16 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
     .replace(/用\s*grok/ig, "")
     .trim();
 
-  const finalPrompt = `你是一位精通 Tailwind CSS 與 Next.js 的資深前端工程師。
-以下是 ユキ&トモヤ 日本選物代購 官網首頁檔案：src/app/page.tsx。
+  const finalPrompt = `你是一位精通 Tailwind CSS 與 Next.js/React 的資深前端工程師。
+以下是 ユキ&トモヤ 日本選物代購 網站的程式檔案：${targetFilePath}。
 
 【色彩庫與 Class 映射】：
 - 純金 / 香檳金: bg-[#C8A878] hover:bg-[#B89868] 或 bg-[#BA9868] hover:bg-[#a68455]
 - LINE 綠色: bg-[#06C755] hover:bg-[#05b34c]
-- 英爵酒紅: bg-[#7A1B28] hover:bg-[#63141f]
+- 天藍色: bg-[#78C4EC] hover:bg-[#6db3e0]
 
 【重要處理規則】：
-1. 根據管理員指令，精準找出 page.tsx 中需要被替換的文字內容（例如 services 陣列裡的標題或描述）或 Tailwind CSS 樣式（例如 pureGoldStyle）。
+1. 根據管理員指令，精準找出 ${targetFilePath} 中需要被替換的文字內容、React 狀態邏輯或 Tailwind CSS 樣式。
 2. 回傳嚴格的 JSON 格式：
 {
   "summary": "修改摘要說明",
@@ -772,7 +778,7 @@ async function modifyFrontendCode(userInstruction: string): Promise<{ success: b
 【管理員指令】：
 "${cleanInstruction}"
 
-【目前首頁程式碼】：
+【目前檔案程式碼】：
 ${currentContent}`;
 
   let parsed: { summary?: string; operations?: Array<{ search: string; replace: string }>; modelName?: string; error?: string } = {};
@@ -841,7 +847,7 @@ ${currentContent}`;
   }
 
   if (appliedCount === 0) {
-    let errorMsg = "在 page.tsx 中找不到對應的原始文字或樣式片段。";
+    let errorMsg = `在 ${targetFilePath} 中找不到對應的原始文字或樣式片段。`;
     if (openRouterError) {
        errorMsg = `修改失敗，原因：${openRouterError}`;
     } else if (!parsed.operations || parsed.operations.length === 0) {
@@ -855,19 +861,20 @@ ${currentContent}`;
     return { success: false, message: "修改失敗：找不到符合的程式碼片段，請確認指定的區塊是否正確。" };
   }
 
-  // 修改前，先將修改前的 currentContent 寫入 Redis
+  // 修改前，先將修改前的 currentContent 寫入 Redis 備份
   if (REDIS_URL) {
     try {
       const redisClient = createClient({ url: REDIS_URL });
       await redisClient.connect();
-      await redisClient.set("yt_site_page_prev_backup", currentContent);
+      const backupKey = isVideoRelated ? "yt_site_player_prev_backup" : "yt_site_page_prev_backup";
+      await redisClient.set(backupKey, currentContent);
       await redisClient.quit();
     } catch (e) {
       console.error("Backup to Redis failed before modifying code:", e);
     }
   }
 
-  const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/src/app/page.tsx`;
+  const putUrl = `https://api.github.com/repos/${REPO_FULL_NAME}/contents/${targetFilePath}`;
   const putRes = await fetch(putUrl, {
     method: "PUT",
     headers: {
@@ -2050,6 +2057,27 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
           , targetId, startTime);
           continue;
         }
+      }
+
+      // 7.5 LINE 加好友連結修改（Redis 高速通道：支援「LINE連結改為：https://...」或「加好友連結改為：...」）
+      const lineUrlMatch = cleanText.match(/(?:LINE|line|加好友)?(?:官方)?(?:加好友)?連結(?:更改為?|修改為?|設定?為|改成|改為|換成)[：:\s]*(https?:\/\/\S+)/i);
+      if (lineUrlMatch && REDIS_URL) {
+        const newOfficialUrl = lineUrlMatch[1].trim();
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        await client.set("yt_line_official_url", newOfficialUrl);
+        await client.quit();
+        try { revalidatePath("/"); } catch {}
+
+        const screenshot = await captureWebsiteScreenshot();
+        await replyLine(
+          replyToken,
+          `🤖 ユキ&トモヤ管理助手\n已成功更新官方 LINE 加好友連結：\n${newOfficialUrl}\n\n全站加好友按鈕已即時生效！`,
+          screenshot,
+          targetId,
+          startTime
+        );
+        continue;
       }
 
       // 8. 網站主標題修改（Redis 高速通道，支援「標題改為...」、「把網頁主標題改成...」）

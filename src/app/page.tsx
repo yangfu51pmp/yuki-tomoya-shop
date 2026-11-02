@@ -9,6 +9,7 @@ export default function HomePage() {
   const [contactOpen, setContactOpen] = useState(false);
 
   // 動態綁定 Redis 的網站主標題、頂部公告與連結
+  const [lineOfficialUrl, setLineOfficialUrl] = useState("https://lin.ee/VFh69eyZ");
   const [siteTitle, setSiteTitle] = useState("日本職人好物・安心直送台灣");
   const [siteAnnouncement, setSiteAnnouncement] = useState("✈️ ユキ&トモヤ 日本現地連線代購中！運動裝備・文具教材・保健益生菌・日本直送");
   const [siteAnnouncementUrl, setSiteAnnouncementUrl] = useState("");
@@ -96,6 +97,7 @@ export default function HomePage() {
     fetch(`/api/line?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
+        if (data?.line_official_url) setLineOfficialUrl(data.line_official_url);
         if (data?.site_title) setSiteTitle(data.site_title);
         if (data?.site_announcement) setSiteAnnouncement(data.site_announcement);
         if (data?.site_announcement_url) setSiteAnnouncementUrl(data.site_announcement_url);
@@ -199,12 +201,17 @@ export default function HomePage() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <button className="hidden sm:flex items-center gap-1 text-xs font-bold text-[#78C4EC] bg-[#bbe3f8] hover:bg-[#a8d0f0] px-3 py-1.5 rounded-full hover:bg-[#78C4EC] hover:text-white transition">
+          <a
+            href={lineOfficialUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1 text-xs font-bold text-[#78C4EC] bg-[#bbe3f8] hover:bg-[#a8d0f0] px-3 py-1.5 rounded-full hover:bg-[#78C4EC] hover:text-white transition"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
-            立即探索日本好物
-          </button>
+            ＋ 加入 LINE 好友
+          </a>
           
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -284,6 +291,16 @@ export default function HomePage() {
             <p className="text-white text-sm sm:text-base max-w-2xl font-medium leading-relaxed tracking-wide drop-shadow">
               嚴選日本棒壘運動裝備、公文教材文具、家庭保健益生菌與日本質感生活百貨。
             </p>
+
+            {/* 入口 A：Hero 主視覺中央醒目加好友按鈕 */}
+            <a
+              href={lineOfficialUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-[#06C755] hover:bg-[#05b34c] text-white font-bold px-7 py-3.5 rounded-full shadow-lg flex items-center gap-2.5 mt-6 transition transform hover:scale-105"
+            >
+              💬 點擊加入 LINE 好友・開啟代購對話 ↗
+            </a>
           </div>
         </section>
 
@@ -398,6 +415,15 @@ export default function HomePage() {
 
                   <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
                     <span className="text-[13px] font-bold text-[#78C4EC] group-hover:text-[#56A8D6] transition">查看商品櫥窗 ↗</span>
+                    <a
+                      href={lineOfficialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[13px] font-bold text-[#06C755] hover:underline"
+                    >
+                      LINE 傳圖詢價 →
+                    </a>
                   </div>
                 </div>
               </div>
@@ -405,6 +431,24 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {/* 入口 B：右下角常駐懸浮「＋加 LINE 好友」提示按鈕 */}
+      <a
+        href={lineOfficialUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="加 LINE 好友諮詢"
+        className="fixed bottom-20 md:bottom-6 right-4 z-50 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 transition transform hover:scale-105 group"
+      >
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-200"></span>
+        </span>
+        <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.92 1.74 5.5 4.39 6.96-.19.7-.69 2.54-.79 2.93-.12.48.17.47.36.35.15-.1 2.06-1.4 2.89-1.97.74.1 1.49.16 2.25.16 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+        </svg>
+        <span className="text-sm tracking-wide">＋加 LINE 好友諮詢</span>
+      </a>
 
       {/* 5. 底部 Footer */}
       <footer className="bg-[#EBF6FC] border-t border-[#6db3e0] text-[#6d6d6d] py-12 px-6 sm:px-12">
@@ -456,7 +500,7 @@ export default function HomePage() {
       {/* 6. 底部固定四格導覽列（KUMON 風格） */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 h-[56px] bg-[#bbe3f8] hover:bg-[#a8d0f0] border-t border-[#C8A878]/30 flex items-stretch shadow-[0_-4px_10px_rgba(0,0,0,0.03)] pb-safe md:hidden">
         <a
-          href="https://line.me"
+          href={lineOfficialUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[#6d6d6d] hover:bg-[#78C4EC]/10 transition relative after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-[1px] after:bg-white"
@@ -508,7 +552,7 @@ export default function HomePage() {
             <span className="cursor-pointer text-stone-400 hover:text-stone-600 text-sm" onClick={() => setContactOpen(false)}>✕</span>
           </div>
           <div className="flex flex-col gap-2.5 text-xs">
-            <a href="https://line.me" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-[#EBF6FC] text-stone-700 font-medium transition">
+            <a href={lineOfficialUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-[#EBF6FC] text-stone-700 font-medium transition">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
               <span>LINE 官方客服</span>
             </a>
@@ -578,7 +622,7 @@ export default function HomePage() {
                           <p className="text-xs text-stone-500 leading-relaxed mb-4">{product.desc}</p>
                         </div>
                         <a
-                          href="https://line.me"
+                          href={lineOfficialUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-full text-center py-2.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
