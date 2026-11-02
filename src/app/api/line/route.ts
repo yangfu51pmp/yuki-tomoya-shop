@@ -1057,9 +1057,57 @@ function robustJSONParse(str: string): any {
 }
 
 
-// 產生 30 秒無縫串連專屬 AI 腳本（支援自然語言導演需求與 0.0s~30.0s 全域時間軸）
-async function generateStitchedAiScript(directorPrompt: string, videoUrls: string[]): Promise<any> {
-  const defaultSubtitles = [
+function parseMp4Duration(buffer: Buffer): number {
+  try {
+    let offset = 0;
+    while (offset < buffer.length - 8) {
+      const size = buffer.readUInt32BE(offset);
+      const type = buffer.toString("ascii", offset + 4, offset + 8);
+      if (size === 0) break;
+      const actualSize = size === 1 ? Number(buffer.readBigUInt64BE(offset + 8)) : size;
+      const headerSize = size === 1 ? 16 : 8;
+
+      if (type === "moov") {
+        let moovOffset = offset + headerSize;
+        const moovEnd = offset + actualSize;
+        while (moovOffset < moovEnd - 8) {
+          const subSize = buffer.readUInt32BE(moovOffset);
+          const subType = buffer.toString("ascii", moovOffset + 4, moovOffset + 8);
+          if (subSize === 0) break;
+          const subActualSize = subSize === 1 ? Number(buffer.readBigUInt64BE(moovOffset + 8)) : subSize;
+          const subHeaderSize = subSize === 1 ? 16 : 8;
+
+          if (subType === "mvhd") {
+            const mvhdOffset = moovOffset + subHeaderSize;
+            const version = buffer.readUInt8(mvhdOffset);
+            let timescale = 0;
+            let duration = 0;
+            if (version === 1) {
+              timescale = buffer.readUInt32BE(mvhdOffset + 20);
+              duration = Number(buffer.readBigUInt64BE(mvhdOffset + 24));
+            } else {
+              timescale = buffer.readUInt32BE(mvhdOffset + 12);
+              duration = buffer.readUInt32BE(mvhdOffset + 16);
+            }
+            if (timescale > 0 && duration > 0) {
+              return duration / timescale;
+            }
+          }
+          moovOffset += subActualSize;
+        }
+      }
+      offset += actualSize;
+    }
+  } catch (e) {
+    console.error("parseMp4Duration error:", e);
+  }
+  return 10;
+}
+
+// 產生全彈性片長無縫串連專屬 AI 腳本（支援自然語言導演需求與 0.0s~totalSec 全域時間軸）
+async function generateStitchedAiScript(directorPrompt: string, videoUrls: string[], totalSec: number = 30): Promise<any> {
+  const scaleRatio = totalSec > 0 ? totalSec / 30 : 1;
+  const rawSubtitles = [
     { start: 0.8, end: 5.0, text: "YUKI & TOMOYA 日本仙台職人生活選物", highlight: "YUKI & TOMOYA", color: "sky" },
     { start: 5.0, end: 10.0, text: "為您精選獨具匠心的日本好物", highlight: "精選獨具匠心", color: "amber" },
     { start: 10.0, end: 15.0, text: "質感生活，從這裡開始", highlight: "質感生活", color: "sky" },
@@ -1067,10 +1115,16 @@ async function generateStitchedAiScript(directorPrompt: string, videoUrls: strin
     { start: 20.0, end: 25.0, text: "歡迎來到 YUKI & TOMOYA 的世界", highlight: "YUKI & TOMOYA", color: "sky" }
   ];
 
+  const defaultSubtitles = rawSubtitles.map(s => ({
+    ...s,
+    start: Math.round(s.start * scaleRatio * 10) / 10,
+    end: Math.round(s.end * scaleRatio * 10) / 10
+  }));
+
   const defaultEvents = [
-    { id: "e1", type: "numbered_pill", number: 1, start: 2.0, end: 9.0, side: "left", title: "日本仙台職人選物", sfx: "pop" },
-    { id: "e2", type: "numbered_pill", number: 2, start: 10.0, end: 18.0, side: "right", title: "質感生活選品推薦", sfx: "pop" },
-    { id: "e3", type: "numbered_pill", number: 3, start: 19.0, end: 26.0, side: "left", title: "日本現地直送安心保證", sfx: "pop" }
+    { id: "e1", type: "numbered_pill", number: 1, start: Math.round(2.0 * scaleRatio * 10) / 10, end: Math.round(9.0 * scaleRatio * 10) / 10, side: "left", title: "日本仙台職人選物", sfx: "pop" },
+    { id: "e2", type: "numbered_pill", number: 2, start: Math.round(10.0 * scaleRatio * 10) / 10, end: Math.round(18.0 * scaleRatio * 10) / 10, side: "right", title: "質感生活選品推薦", sfx: "pop" },
+    { id: "e3", type: "numbered_pill", number: 3, start: Math.round(19.0 * scaleRatio * 10) / 10, end: Math.round(26.0 * scaleRatio * 10) / 10, side: "left", title: "日本現地直送安心保證", sfx: "pop" }
   ];
 
   const baseScript: any = {
@@ -1102,14 +1156,14 @@ async function generateStitchedAiScript(directorPrompt: string, videoUrls: strin
     events: defaultEvents
   };
 
-  const aiPrompt = `你是一位專業的短影音導演。這是一支由 ${videoUrls.length} 段 10 秒影片組成的 30 秒 (0.0s ~ 30.0s) 無縫串連影片。
+  const aiPrompt = `你是一位專業的短影音導演。這是一支由 ${videoUrls.length} 段影片組成的總長約 ${Math.round(totalSec)} 秒 (0.0s ~ ${totalSec.toFixed(1)}s) 無縫串連影片。
 品牌為「ユキ&トモヤ 日本選物代購」（日本仙台職人生活選物、文具教材、運動保健）。
 管理員提出了以下導演需求：
 "${directorPrompt}"
 
-請根據管理員需求，設計 0.0s ~ 30.0s 全域時間軸的腳本。
+請根據管理員需求，設計 0.0s ~ ${totalSec.toFixed(1)}s 全域時間軸的腳本。
 嚴格規則：
-1. subtitles 陣列必須包含覆蓋 0.0s ~ 25.0s 或 28.0s 的字幕（每段 2~4 秒，包含 start, end, text, highlight, color），若管理員無特別指定自訂台詞，請以高品質日系選物品牌台詞為主。
+1. subtitles 陣列必須包含覆蓋 0.0s ~ ${(totalSec * 0.85).toFixed(1)}s 的字幕（每段 2~4 秒，包含 start, end, text, highlight, color），若管理員無特別指定自訂台詞，請以高品質日系選物品牌台詞為主。
 2. events 陣列必須包含適當的視覺字卡事件（若管理員要求不要字卡，則 events 為空陣列 []）。
 3. 如果要求靜音某段，audioConfig.clipMuted 相應位置設為 true。
 4. 如果要求不要封面或不要片頭片尾，showCover 與 showOutro 設為 false。
@@ -1368,6 +1422,8 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
           if (stitchMode === "collecting") {
             const queueRaw = await client.get("line_video_stitch_queue");
             const queue: string[] = queueRaw ? JSON.parse(queueRaw) : [];
+            const durationsRaw = await client.get("line_video_stitch_durations");
+            const durations: number[] = durationsRaw ? JSON.parse(durationsRaw) : [];
 
             try {
               const videoRes = await fetch(`https://api-data.line.me/v2/bot/message/${event.message.id}/content`, {
@@ -1375,7 +1431,9 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
               });
               if (videoRes.ok) {
                 const arrayBuffer = await videoRes.arrayBuffer();
-                const b64 = Buffer.from(arrayBuffer).toString("base64");
+                const bufferObj = Buffer.from(arrayBuffer);
+                const clipSec = Math.round(parseMp4Duration(bufferObj) * 10) / 10;
+                const b64 = bufferObj.toString("base64");
                 const filename = `preview-clip-${queue.length + 1}.mp4`;
                 const uploadedFilename = await uploadVideoToGitHub(b64, true, filename);
 
@@ -1384,14 +1442,23 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
                   const rawVideoUrl = `https://raw.githubusercontent.com/${REPO_FULL_NAME}/main/public/${uploadedFilename}?t=${Date.now()}`;
                   const newVideoUrl = rawVideoUrl;
                   queue.push(newVideoUrl);
+                  durations.push(clipSec);
                   await client.set("line_video_stitch_queue", JSON.stringify(queue));
+                  await client.set("line_video_stitch_durations", JSON.stringify(durations));
 
+                  const totalAccSec = Math.round(durations.reduce((acc, d) => acc + d, 0) * 10) / 10;
                   const aiScriptTemp = { showCover: false, showOutro: false, showCards: false, showSubtitles: true };
-                  const previewDataObj = { videoUrl: queue[0], videoUrls: queue, aiScript: aiScriptTemp, timestamp: Date.now() };
+                  const previewDataObj = { videoUrl: queue[0], videoUrls: queue, clipDurations: durations, aiScript: aiScriptTemp, timestamp: Date.now() };
                   await client.set("preview_video_data", JSON.stringify(previewDataObj));
                   await client.set("yt_preview_video", queue[0]);
                   await client.set("yt_preview_ai_script", JSON.stringify(aiScriptTemp));
-                  await replyLine(replyToken, "✅ 已收到第 " + queue.length + " 段串連影片！\n請繼續上傳下一支影片，或輸入：\n「@ユキ&トモヤ管理助手 完成串連：[背景音/台詞/字卡需求]」", undefined, targetId, startTime);
+                  await replyLine(
+                    replyToken,
+                    `✅ 已收到第 ${queue.length} 段串連影片（片長約 ${clipSec} 秒，目前累計共 ${totalAccSec} 秒）！\n請繼續上傳下一支影片，或輸入：\n「@ユキ&トモヤ管理助手 完成串連：[背景音/台詞/字卡需求]」`,
+                    undefined,
+                    targetId,
+                    startTime
+                  );
                   await client.quit();
                   continue;
                 }
@@ -1536,6 +1603,7 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
           const client = createClient({ url: REDIS_URL });
           await client.connect();
           await client.set("line_video_stitch_queue", JSON.stringify([]));
+          await client.set("line_video_stitch_durations", JSON.stringify([]));
           await client.set("line_video_stitch_mode", "collecting");
           await client.quit();
 
@@ -1556,6 +1624,8 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
           await client.connect();
           const queueRaw = await client.get("line_video_stitch_queue");
           let videoUrls = queueRaw ? JSON.parse(queueRaw) : [];
+          const durationsRaw = await client.get("line_video_stitch_durations");
+          let durations: number[] = durationsRaw ? JSON.parse(durationsRaw) : [];
           await client.set("line_video_stitch_mode", "idle");
 
           if (videoUrls.length === 0) {
@@ -1566,18 +1636,23 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
                  const prevData = JSON.parse(prevDataStr);
                  if (prevData.videoUrls && prevData.videoUrls.length > 0) {
                     videoUrls = prevData.videoUrls;
+                    if (prevData.clipDurations) durations = prevData.clipDurations;
                  }
                } catch (e) {}
             }
           }
 
           if (videoUrls.length > 0) {
+             const totalSec = durations.length === videoUrls.length && durations.length > 0
+               ? durations.reduce((acc, d) => acc + (d || 10), 0)
+               : videoUrls.length * 10;
              const directorPrompt = cleanText.split(/[:：]/).slice(1).join(':').trim() || "";
-             const aiScript = await generateStitchedAiScript(directorPrompt, videoUrls);
+             const aiScript = await generateStitchedAiScript(directorPrompt, videoUrls, totalSec);
 
              const stitchDataObj = {
                 videoUrl: videoUrls[0],
                 videoUrls,
+                clipDurations: durations,
                 aiScript,
                 timestamp: Date.now()
              };
@@ -1588,7 +1663,7 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
 
              const subCount = aiScript?.subtitles?.length || 0;
              const cardCount = aiScript?.events?.length || 0;
-             const summary = `✅ 🎬 串連製片完成（v7.3 30秒無縫全域時間軸）！AI 導演已收到您的指示：\n${directorPrompt ? '- 導演需求：' + directorPrompt : '- 預設製片模式'}\n- 全域字幕：共 ${subCount} 句 (0.0s~30.0s)\n- 動態字卡：共 ${cardCount} 張\n\n🔗 專屬預覽連結：https://yuki-tomoya-shop.vercel.app/?preview=video`;
+             const summary = `✅ 🎬 串連製片完成（v7.3 全片約 ${Math.round(totalSec)} 秒無縫全域時間軸）！AI 導演已收到您的指示：\n${directorPrompt ? '- 導演需求：' + directorPrompt : '- 預設製片模式'}\n- 全域字幕：共 ${subCount} 句 (0.0s~${totalSec.toFixed(1)}s)\n- 動態字卡：共 ${cardCount} 張\n\n🔗 專屬預覽連結：https://yuki-tomoya-shop.vercel.app/?preview=video`;
              await replyLine(
                 replyToken,
                 `${summary}\n\n💬 後續操作指令：\n- 確認無誤請輸入：@ユキ&トモヤ管理助手 確認上架影片\n- 想調整字卡或字幕請輸入：@ユキ&トモヤ管理助手 修改製片：[您的修改要求]\n- 放棄請輸入：@ユキ&トモヤ管理助手 取消上架影片`,
@@ -2169,7 +2244,12 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
 
         // If previewing multi-clip stitched video, update stitch script with strict isolation!
         if (parsedPreviewData && Array.isArray(parsedPreviewData.videoUrls) && parsedPreviewData.videoUrls.length >= 2) {
-          const newAiScript = await generateStitchedAiScript(userModification, parsedPreviewData.videoUrls);
+          const clipDurs: number[] = Array.isArray(parsedPreviewData.clipDurations) ? parsedPreviewData.clipDurations : [];
+          const totalSec = clipDurs.length === parsedPreviewData.videoUrls.length && clipDurs.length > 0
+            ? clipDurs.reduce((acc, d) => acc + (d || 10), 0)
+            : parsedPreviewData.videoUrls.length * 10;
+
+          const newAiScript = await generateStitchedAiScript(userModification, parsedPreviewData.videoUrls, totalSec);
           parsedPreviewData.aiScript = newAiScript;
           parsedPreviewData.timestamp = Date.now();
 
@@ -2181,7 +2261,7 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
 
           const subCount = newAiScript?.subtitles?.length || 0;
           const cardCount = newAiScript?.events?.length || 0;
-          const summary = `✅ 已完成 30 秒串連修改製片！\n- 修改需求：${userModification}\n- 全域字幕：共 ${subCount} 句 (0.0s~30.0s)\n- 動態字卡：共 ${cardCount} 張\n\n🔗 專屬預覽連結：https://yuki-tomoya-shop.vercel.app/?preview=video`;
+          const summary = `✅ 已完成串連修改製片（全片約 ${Math.round(totalSec)} 秒）！\n- 修改需求：${userModification}\n- 全域字幕：共 ${subCount} 句 (0.0s~${totalSec.toFixed(1)}s)\n- 動態字卡：共 ${cardCount} 張\n\n🔗 專屬預覽連結：https://yuki-tomoya-shop.vercel.app/?preview=video`;
           await replyLine(
             replyToken,
             `${summary}\n\n💬 後續操作指令：\n- 確認無誤請輸入：@ユキ&トモヤ管理助手 確認上架影片\n- 放棄請輸入：@ユキ&トモヤ管理助手 取消上架影片`,

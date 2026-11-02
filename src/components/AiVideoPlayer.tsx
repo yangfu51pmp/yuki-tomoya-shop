@@ -236,6 +236,22 @@ export default function AiVideoPlayer({
     }
   }
 
+  // 若字幕的最大 end 秒數與實際 totalDuration 落差超過 5 秒，自動按比例縮放字幕時間軸以貼合實際片長
+  if (resolvedScript && Array.isArray(resolvedScript.subtitles) && resolvedScript.subtitles.length > 0 && totalDuration > 0) {
+    const maxEnd = Math.max(...resolvedScript.subtitles.map((s: any) => s.end || 0));
+    if (maxEnd > 0 && Math.abs(maxEnd - totalDuration) > 5) {
+      const ratio = totalDuration / maxEnd;
+      resolvedScript = {
+        ...resolvedScript,
+        subtitles: resolvedScript.subtitles.map((s: any) => ({
+          ...s,
+          start: Math.round(s.start * ratio * 10) / 10,
+          end: Math.round(s.end * ratio * 10) / 10
+        }))
+      };
+    }
+  }
+
 
   const rawVideoArrayBufferRefs = useRef<(ArrayBuffer | null)[]>([]);
   const decodedAudioBufferRefs = useRef<(AudioBuffer | null)[]>([]);
@@ -1561,7 +1577,7 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
                     >
                       <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v7.3｜30秒無縫串連)
+                      🎬 匯出有聲 MP4 影片 (v7.3｜已串連 {clips.length} 段・共 {Math.round(totalDuration)} 秒)
                     </button>
                   )}
                 </div>
