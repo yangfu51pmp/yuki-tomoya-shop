@@ -180,7 +180,7 @@ export async function middleware(req: NextRequest) {
     status: 401,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'WWW-Authenticate': 'Basic realm="ユキ&トモヤ 日本選物代購 Private Staging"'
+      'WWW-Authenticate': 'Basic realm="Yuki & Tomoya Private Staging"'
     }
   });
 }

@@ -280,12 +280,12 @@ export default function AiVideoPlayer({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [isVertical, setIsVertical] = useState(false);
 
   // Local toggle for effect without changing redis
   const [effectEnabled, setEffectEnabled] = useState(resolvedScript?.enabled !== false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [jumpCutEnabled, setJumpCutEnabled] = useState(false);
   const [currentSpeechZoom, setCurrentSpeechZoom] = useState<number>(1);
   const [cardsVisible, setCardsVisible] = useState(resolvedScript?.showCards !== false);
@@ -301,8 +301,8 @@ export default function AiVideoPlayer({
   const playedSfxRef = useRef<Set<string>>(new Set());
   const lastUpdateRef = useRef<number>(0);
   const lastSeekRef = useRef<number>(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [hasStarted, setHasStarted] = useState(true);
 
   const unlockAudio = useCallback(() => {
     videoRefs.current.forEach(v => {
@@ -312,6 +312,7 @@ export default function AiVideoPlayer({
       }
     });
     setIsVideoMuted(false);
+    setSoundEnabled(true);
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!audioContextRef.current && AudioContextClass) {
@@ -334,6 +335,34 @@ export default function AiVideoPlayer({
       console.log('Audio unlock failed', e);
     }
   }, []);
+
+  // 客人進首頁立即自動無縫播放：元件載入後自動嘗試 play() 第一段影片
+  useEffect(() => {
+    const firstVideo = videoRefs.current[0];
+    if (firstVideo) {
+      firstVideo.muted = true;
+      firstVideo.play().then(() => {
+        setIsPlaying(true);
+        setHasStarted(true);
+      }).catch((err) => {
+        console.log("Autoplay was prevented, waiting for interaction", err);
+      });
+    }
+
+    const handleFirstUserInteraction = () => {
+      unlockAudio();
+      window.removeEventListener("click", handleFirstUserInteraction);
+      window.removeEventListener("touchstart", handleFirstUserInteraction);
+    };
+
+    window.addEventListener("click", handleFirstUserInteraction, { once: true });
+    window.addEventListener("touchstart", handleFirstUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener("click", handleFirstUserInteraction);
+      window.removeEventListener("touchstart", handleFirstUserInteraction);
+    };
+  }, [unlockAudio]);
 
 
   useEffect(() => {
@@ -1082,7 +1111,8 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
               ref={(el) => { videoRefs.current[idx] = el; }}
               src={clipUrl}
               preload="auto"
-              autoPlay={idx === 0}
+              autoPlay
+              muted
               playsInline
               controls={false}
               controlsList={!isPreviewMode ? "nodownload" : undefined}
@@ -1138,49 +1168,6 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
           );
         })}
 
-        {/* Playback Overlays */}
-        {!hasStarted && !isExporting && (
-          <div className="absolute inset-0 z-40 pointer-events-auto flex items-center justify-center bg-black/40"
-               onClick={() => {
-                 const v = videoRefs.current[currentClipIndex];
-                 if (v) {
-                   v.muted = false;
-                   v.volume = 1.0;
-                   if (v.paused) {
-                     v.play().catch(() => { v.muted = true; v.play(); });
-                     setIsPlaying(true);
-                   } else {
-                     v.pause();
-                     setIsPlaying(false);
-                   }
-                 }
-                 setHasStarted(true);
-               }}
-          >
-            <div className="bg-[#78C4EC] text-white px-6 py-3 rounded-full font-extrabold shadow-2xl flex items-center gap-2 hover:bg-[#6db3e0] transition transform hover:scale-105 cursor-pointer text-lg">
-              ▶ 點擊播放影片（含聲音＋AI特效）
-            </div>
-          </div>
-        )}
-
-        {hasStarted && !isPlaying && !isExporting && (
-          <div className="absolute inset-0 z-40 pointer-events-none flex items-center justify-center">
-            <div className="pointer-events-auto bg-black/50 text-white p-4 rounded-full backdrop-blur-sm cursor-pointer hover:bg-black/70 transition shadow-xl border border-white/20"
-                 onClick={(e) => {
-                   e.stopPropagation();
-                   const v = videoRefs.current[currentClipIndex];
-                   if (v && v.paused) {
-                     v.play().catch(() => { v.muted = true; v.play(); });
-                     setIsPlaying(true);
-                   }
-                 }}
-            >
-              <div className="flex items-center gap-2 text-lg font-bold pr-2">
-                <span className="text-2xl">▶</span> 繼續播放
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Bottom Playback Bar */}
         {!isExporting && (
@@ -1479,143 +1466,54 @@ const renderSubtitleText = (text: string, highlight?: string, color?: string) =>
         )}
       </div>
 
-      {!isFullscreen && (
+      {!isFullscreen && isPreviewMode && (
         <>
-          {/* 控制列 */}
-                <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-sm border border-[#bbe3f8] mt-2 w-full max-w-sm sm:max-w-md">
-                  <button
-                    onClick={() => { unlockAudio(); setCardsVisible(!cardsVisible); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${cardsVisible ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]" : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"}`}
-                  >
-                    🃏 字卡：{cardsVisible ? "開" : "關"}
-                  </button>
+          {/* 僅在預覽模式下提供匯出 MP4 功能按鈕，正式首頁隱藏下方控制框 */}
+          <div className="flex flex-wrap items-center justify-center gap-3 bg-white px-4 py-2 sm:px-6 sm:py-3 rounded-2xl shadow-sm border border-[#bbe3f8] mt-2 w-full max-w-sm sm:max-w-md">
+            <button
+              onClick={() => { unlockAudio(); exportVideo(); }}
+              disabled={(!resolvedScript) || !effectEnabled || isExporting}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+            >
+              <Download className="w-4 h-4" />
+              🎬 匯出有聲 MP4 影片 (v7.3｜已串連 {clips.length} 段・共 {Math.round(totalDuration)} 秒)
+            </button>
+          </div>
 
-                  <button
-                    onClick={() => { unlockAudio(); setSubtitlesVisible(!subtitlesVisible); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${subtitlesVisible ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]" : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"}`}
-                  >
-                    💬 字幕：{subtitlesVisible ? "開" : "關"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      unlockAudio();
-                      const v = videoRefs.current[currentClipIndex];
-                      if (v) {
-                        if (v.paused) {
-                          v.play().catch(() => { v.muted = true; v.play(); });
-                          setIsPlaying(true);
-                        } else {
-                          v.pause();
-                          setIsPlaying(false);
-                        }
-                      }
-                    }}
-                    disabled={isExporting}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#0F172A] hover:bg-gray-200"
-                  >
-                    {isPlaying ? '⏸ 暫停影片' : '▶ 播放影片'}
-                  </button>
+          {/* 匯出結果區塊 */}
+          {exportedUrl && exportedFile && (
+            <div className="w-full max-w-sm sm:max-w-md bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm mt-2 flex flex-col gap-3">
+              <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
+                ✅ 影片已匯出成功！
+              </div>
+              <video src={exportedUrl} controls playsInline className="w-full rounded-lg shadow-sm border border-emerald-100" />
 
-                  <button
-                    onClick={() => {
-                      unlockAudio();
-                      const nextMuted = !isVideoMuted;
-                      videoRefs.current.forEach((v) => {
-                        if (v) v.muted = nextMuted;
-                      });
-                      setIsVideoMuted(nextMuted);
-                      setSoundEnabled(!nextMuted);
-                    }}
-                    disabled={isExporting}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-                      !isVideoMuted
-                        ? "bg-[#bbe3f8] text-[#0F172A] shadow-sm hover:bg-[#a9d9f2]"
-                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-                    }`}
-                  >
-                    {!isVideoMuted ? "🔊 影片聲音：開" : "🔇 影片聲音：靜音"}
-                  </button>
+              <button
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: 'Yuki & Tomoya Video',
+                      files: [exportedFile]
+                    }).catch(console.error);
+                  } else {
+                    alert('您的裝置不支援快速分享功能，請長按影片或點擊下方按鈕下載');
+                  }
+                }}
+                className="w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+              >
+                📲 儲存到 iPhone 相簿 / 傳送至 LINE
+              </button>
 
-                  <button
-                    onClick={() => { unlockAudio(); setEffectEnabled(!effectEnabled); }}
-                    disabled={(!resolvedScript) || isExporting}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-                      (!resolvedScript) ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-                      effectEnabled
-                        ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
-                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-                    }`}
-                  >
-                    {effectEnabled ? <Sparkles className="w-4 h-4" /> : <Film className="w-4 h-4" />}
-                    {effectEnabled ? "✨ AI 特效" : "🎬 原始影片"}
-                  </button>
-
-                  <button
-                    onClick={() => { unlockAudio(); setJumpCutEnabled(!jumpCutEnabled); }}
-                    disabled={(!resolvedScript) || isExporting}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
-                      (!resolvedScript) ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400" :
-                      jumpCutEnabled
-                        ? "bg-[#78C4EC] text-white shadow-md hover:bg-[#6db3e0]"
-                        : "bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-                    }`}
-                  >
-                    {jumpCutEnabled ? "✂️ 氣口剪輯：開" : "✂️ 氣口剪輯：關"}
-                  </button>
-
-                  <button
-                    onClick={() => { unlockAudio(); setIsFullscreen(true); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors bg-gray-100 text-[#6d6d6d] hover:bg-gray-200"
-                  >
-                    ⛶ 全螢幕放大
-                  </button>
-
-                  {isPreviewMode && (
-                    <button
-                      onClick={() => { unlockAudio(); exportVideo(); }}
-                      disabled={(!resolvedScript) || !effectEnabled || isExporting}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-white text-[#78C4EC] border border-[#78C4EC] hover:bg-[#F2FAFD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
-                    >
-                      <Download className="w-4 h-4" />
-                      🎬 匯出有聲 MP4 影片 (v7.3｜已串連 {clips.length} 段・共 {Math.round(totalDuration)} 秒)
-                    </button>
-                  )}
-                </div>
-
-                {/* 匯出結果區塊 */}
-                {isPreviewMode && exportedUrl && exportedFile && (
-                  <div className="w-full max-w-sm sm:max-w-md bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm mt-2 flex flex-col gap-3">
-                    <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
-                      ✅ 影片已匯出成功！
-                    </div>
-                    <video src={exportedUrl} controls playsInline className="w-full rounded-lg shadow-sm border border-emerald-100" />
-
-                    <button
-                      onClick={() => {
-                        if (navigator.share) {
-                          navigator.share({
-                            title: 'Yuki & Tomoya Video',
-                            files: [exportedFile]
-                          }).catch(console.error);
-                        } else {
-                          alert('您的裝置不支援快速分享功能，請長按影片或點擊下方按鈕下載');
-                        }
-                      }}
-                      className="w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2"
-                    >
-                      📲 儲存到 iPhone 相簿 / 傳送至 LINE
-                    </button>
-
-                    <div className="flex flex-col gap-2 mt-1">
-                      <a href={exportedUrl} download="yuki-tomoya-video.mp4" className="text-center text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 py-2 rounded-lg transition">
-                        ⬇ 下載 MP4 檔案
-                      </a>
-                      <a href={videoUrl} download="original-video.mp4" className="text-center text-xs font-bold text-stone-500 hover:text-stone-600 bg-stone-100/50 py-2 rounded-lg transition">
-                        ⬇ 下載原始 MP4 影片
-                      </a>
-                    </div>
-                  </div>
-                )}
+              <div className="flex flex-col gap-2 mt-1">
+                <a href={exportedUrl} download="yuki-tomoya-video.mp4" className="text-center text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 py-2 rounded-lg transition">
+                  ⬇ 下載 MP4 檔案
+                </a>
+                <a href={videoUrl} download="original-video.mp4" className="text-center text-xs font-bold text-stone-500 hover:text-stone-600 bg-stone-100/50 py-2 rounded-lg transition">
+                  ⬇ 下載原始 MP4 影片
+                </a>
+              </div>
+            </div>
+          )}
         </>
       )}
 
