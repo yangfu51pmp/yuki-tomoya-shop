@@ -4,6 +4,10 @@ import { createClient } from "redis";
 
 export const maxDuration = 60;
 
+import { CategoryItem, ProductItem, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS_CATALOG } from "@/types/ecommerce";
+export type { CategoryItem, ProductItem };
+export { DEFAULT_CATEGORIES, DEFAULT_PRODUCTS_CATALOG };
+
 // 智慧輪詢等待部署完成
 async function waitForDeployment(expectedText?: string) {
   console.log("Waiting 15 seconds before first deployment check...");
@@ -66,6 +70,9 @@ export async function GET(req: NextRequest) {
         site_hero_image: "",
         preview_video: "",
         preview_ai_script: null,
+        categories: DEFAULT_CATEGORIES,
+        products: DEFAULT_PRODUCTS_CATALOG,
+        line_official_url: "https://lin.ee/VFh69eyZ",
         _t,
       });
     }
@@ -149,7 +156,8 @@ export async function GET(req: NextRequest) {
       site_title, site_announcement, site_announcement_url, site_hero_image, site_promo_video, site_promo_video_title, site_promo_poster, site_promo_orientation,
       cat_img_1, cat_img_2, cat_img_3, cat_img_4, cat_img_5, cat_img_6, cat_img_7, cat_img_8,
       cat_products_1, cat_products_2, cat_products_3, video_ai_script, preview_video, preview_ai_script,
-      preview_video_data, published_video_data, line_video_stitch_queue, yt_line_official_url
+      preview_video_data, published_video_data, line_video_stitch_queue, yt_line_official_url,
+      yt_categories, yt_products_catalog
     ] = await Promise.all([
       client.get("yt_site_title"),
       client.get("yt_site_announcement"),
@@ -177,8 +185,34 @@ export async function GET(req: NextRequest) {
       client.get("published_video_data"),
       client.get("line_video_stitch_queue"),
       client.get("yt_line_official_url"),
+      client.get("yt_categories"),
+      client.get("yt_products_catalog"),
     ]);
     await client.quit();
+
+    let categoriesToReturn: CategoryItem[] = DEFAULT_CATEGORIES;
+    if (yt_categories) {
+      try {
+        const parsed = JSON.parse(yt_categories);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          categoriesToReturn = parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse yt_categories:", e);
+      }
+    }
+
+    let productsToReturn: ProductItem[] = DEFAULT_PRODUCTS_CATALOG;
+    if (yt_products_catalog) {
+      try {
+        const parsed = JSON.parse(yt_products_catalog);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          productsToReturn = parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse yt_products_catalog:", e);
+      }
+    }
 
     const defaultClips = ['/preview-clip-1.mp4', '/preview-clip-2.mp4', '/preview-clip-3.mp4'];
     let parsedPublishedData: any = null;
@@ -238,6 +272,8 @@ export async function GET(req: NextRequest) {
         preview_ai_script: previewAiScriptToReturn,
         line_video_stitch_queue: line_video_stitch_queue ? JSON.parse(line_video_stitch_queue) : [],
         line_official_url: yt_line_official_url || "https://lin.ee/VFh69eyZ",
+        categories: categoriesToReturn,
+        products: productsToReturn,
       },
       {
         headers: {
@@ -255,6 +291,8 @@ export async function GET(req: NextRequest) {
       site_announcement_url: "",
       site_hero_image: "",
       line_official_url: "https://lin.ee/VFh69eyZ",
+      categories: DEFAULT_CATEGORIES,
+      products: DEFAULT_PRODUCTS_CATALOG,
     });
   }
 }
@@ -1654,6 +1692,107 @@ https://yuki-tomoya-shop.vercel.app 現在分享時會帶出那張滿版縮圖�
           await replyLine(
             replyToken,
             `✅ 已成功更新客人自動回覆詞！\n\n目前設定為：\n「${newWelcomeMsg}」`,
+            undefined,
+            targetId,
+            startTime
+          );
+        }
+        continue;
+      }
+
+      // 【動態分類引擎管理員指令：新增分類】
+      // 例如：@ユキ&トモヤ管理助手 新增分類：六、日本零食｜JAPAN SNACKS｜北海道與仙台限定伴手禮與人氣菓物
+      const addCategoryMatch = cleanText.match(/^(?:新增分類|擴充分類|添加分類)[：:\s]*([^｜|]+)[｜|]([^｜|]+)[｜|](.+)$/);
+      if (addCategoryMatch && REDIS_URL) {
+        const title = addCategoryMatch[1].trim();
+        const enTitle = addCategoryMatch[2].trim();
+        const description = addCategoryMatch[3].trim();
+
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        const rawCategories = await client.get("yt_categories");
+        let categories: CategoryItem[] = DEFAULT_CATEGORIES;
+        if (rawCategories) {
+          try {
+            const parsed = JSON.parse(rawCategories);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              categories = parsed;
+            }
+          } catch (e) {}
+        }
+
+        // 自動推導 ID
+        let derivedId = enTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        if (!derivedId || categories.some((c) => c.id === derivedId)) {
+          derivedId = `cat-${Date.now()}`;
+        }
+
+        const newCategory: CategoryItem = {
+          id: derivedId,
+          order: categories.length + 1,
+          title,
+          enTitle,
+          description,
+          coverImage: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80",
+        };
+
+        categories.push(newCategory);
+        await client.set("yt_categories", JSON.stringify(categories));
+        await client.quit();
+
+        try { revalidatePath("/"); } catch {}
+
+        await replyLine(
+          replyToken,
+          `✅ 已成功擴充新分類！前台搜尋列與分類專區已同步更新\n\n【新增分類資訊】\n• 順序：第 ${newCategory.order} 類\n• 標題：${title}\n• 英文：${enTitle}\n• ID：${newCategory.id}\n• 介紹：${description}`,
+          undefined,
+          targetId,
+          startTime
+        );
+        continue;
+      }
+
+      // 【動態分類引擎管理員指令：刪除分類】
+      // 例如：@ユキ&トモヤ管理助手 刪除分類：六、日本零食 或 刪除分類：snacks
+      const deleteCategoryMatch = cleanText.match(/^(?:刪除分類|移除分類)[：:\s]*(.+)$/);
+      if (deleteCategoryMatch && REDIS_URL) {
+        const targetQuery = deleteCategoryMatch[1].trim();
+
+        const client = createClient({ url: REDIS_URL });
+        await client.connect();
+        const rawCategories = await client.get("yt_categories");
+        let categories: CategoryItem[] = DEFAULT_CATEGORIES;
+        if (rawCategories) {
+          try {
+            const parsed = JSON.parse(rawCategories);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              categories = parsed;
+            }
+          } catch (e) {}
+        }
+
+        const initialCount = categories.length;
+        const filtered = categories.filter((c) => c.id !== targetQuery && !c.title.includes(targetQuery) && !c.enTitle.toLowerCase().includes(targetQuery.toLowerCase()));
+
+        if (filtered.length < initialCount) {
+          // 重新整理 order
+          const reordered = filtered.map((c, idx) => ({ ...c, order: idx + 1 }));
+          await client.set("yt_categories", JSON.stringify(reordered));
+          await client.quit();
+          try { revalidatePath("/"); } catch {}
+
+          await replyLine(
+            replyToken,
+            `✅ 已成功刪除分類「${targetQuery}」！前台分類已同步更新，目前共有 ${reordered.length} 個分類。`,
+            undefined,
+            targetId,
+            startTime
+          );
+        } else {
+          await client.quit();
+          await replyLine(
+            replyToken,
+            `❌ 找不到符合「${targetQuery}」的分類名稱或 ID，目前現有分類：\n${categories.map((c) => `• ${c.title} (ID: ${c.id})`).join("\n")}`,
             undefined,
             targetId,
             startTime
