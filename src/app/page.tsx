@@ -4,6 +4,11 @@
 import { useState, useEffect, useMemo } from "react";
 import AiVideoPlayer from "@/components/AiVideoPlayer";
 import { CategoryItem, ProductItem, DEFAULT_CATEGORIES, DEFAULT_PRODUCTS_CATALOG } from "@/types/ecommerce";
+import type { CartItem } from '@/lib/shop-db';
+import CartCheckoutModal from '@/components/CartCheckoutModal';
+import WishFormSection from '@/components/WishFormSection';
+import { Menu, X, ShoppingCart, MessageCircle, Plus, Minus } from 'lucide-react';
+
 
 export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,7 +35,58 @@ export default function HomePage() {
   const [products, setProducts] = useState<ProductItem[]>(DEFAULT_PRODUCTS_CATALOG);
 
   // 尋物控制中心狀態（搜尋關鍵字、選中分類 ID、選中狀態標籤）
+
   const [searchKeyword, setSearchKeyword] = useState("");
+
+  // Shopping Cart State
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Load cart from local storage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('yt_cart');
+      if (saved) setCartItems(JSON.parse(saved));
+    } catch (e) {}
+  }, []);
+
+  // Save cart to local storage
+  useEffect(() => {
+    localStorage.setItem('yt_cart', JSON.stringify(cartItems));
+  }, [cartItems]);
+
+  const addToCart = (product: ProductItem, spec: string, qty: number) => {
+    setCartItems(prev => {
+      const existing = prev.find(item => item.id === product.id && item.spec === spec);
+      if (existing) {
+        return prev.map(item => item.id === product.id && item.spec === spec ? { ...item, quantity: item.quantity + qty } : item);
+      }
+      return [...prev, {
+        id: product.id,
+        name: product.name,
+        spec: spec || (product.specs && product.specs[0]) || '標準規格',
+        price: product.price,
+        quantity: qty,
+        imageUrl: product.images[0]
+      }];
+    });
+    setIsCartOpen(true);
+  };
+
+  const updateCartQuantity = (id: string, delta: number) => {
+    setCartItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }));
+  };
+
+  const removeCartItem = (id: string) => {
+    setCartItems(prev => prev.filter(item => item.id !== id));
+  };
+
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_stock" | "preorder" | "sendai_pickup">("all");
 
@@ -138,17 +194,24 @@ export default function HomePage() {
       if (statusFilter === "preorder" && item.status !== "preorder") return false;
       if (statusFilter === "sendai_pickup" && !item.allowSendaiPickup) return false;
 
+
+
       // 3. 關鍵字搜尋（品名、分類名、描述）
       if (searchKeyword.trim()) {
         const kw = searchKeyword.toLowerCase().trim();
         const matchName = item.name.toLowerCase().includes(kw);
         const matchCategory = item.categoryName.toLowerCase().includes(kw);
+        const matchSubCategory = (item.subCategory || '').toLowerCase().includes(kw);
         const matchDesc = item.description.toLowerCase().includes(kw);
         const matchSpecs = item.specs?.some(s => s.toLowerCase().includes(kw));
-        if (!matchName && !matchCategory && !matchDesc && !matchSpecs) {
+        const matchTags = item.badges?.some(b => b.toLowerCase().includes(kw));
+
+        if (!matchName && !matchCategory && !matchSubCategory && !matchDesc && !matchSpecs && !matchTags) {
           return false;
         }
       }
+
+
 
       return true;
     });
@@ -289,6 +352,7 @@ export default function HomePage() {
                     key={cat.id}
                     onClick={() => {
                       setSelectedCategoryId(cat.id);
+                          setSearchKeyword("");
                       setMenuOpen(false);
                       const el = document.getElementById("search-section");
                       if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -460,24 +524,36 @@ export default function HomePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                <input
-                  type="text"
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  placeholder="輸入商品名稱、分類關鍵字（如：棒球手套、 Campus、益智拼圖、酵素、仙台...）"
-                  className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#78C4EC] focus:border-transparent transition shadow-inner"
-                />
-                {searchKeyword && (
-                  <button
-                    onClick={() => setSearchKeyword("")}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-stone-400 hover:text-stone-600 transition"
-                    title="清除搜尋"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
+
+                  <input
+                    type="text"
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setSelectedCategoryId("all");
+                        const el = document.getElementById("products-grid");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }
+                    }}
+                    placeholder="輸入商品名稱、分類關鍵字（如：棒球手套、 Campus、益智拼圖、酵素、仙台...）"
+                    className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-full text-sm font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#78C4EC] focus:border-transparent transition shadow-inner"
+                  />
+                  {searchKeyword && (
+                    <button
+                      onClick={() => {
+                        setSearchKeyword("");
+                        setSelectedCategoryId("all");
+                        const el = document.getElementById("products-grid");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-stone-400 hover:text-stone-600 transition"
+                      title="清除搜尋"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
+
               </div>
 
               {/* 動態分類切換膠囊列（Dynamic Category Tabs - 支援未來無限擴充自動換行） */}
@@ -577,6 +653,7 @@ export default function HomePage() {
                   key={item.id}
                   onClick={() => {
                     setSelectedCategoryId(item.id);
+                    setSearchKeyword("");
                     const el = document.getElementById("products-grid");
                     if (el) el.scrollIntoView({ behavior: "smooth" });
                   }}
@@ -959,22 +1036,30 @@ export default function HomePage() {
               </div>
 
               {/* 雙行動按鈕 */}
+
               <div className="pt-2 flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={handleAddToCart}
+                  onClick={() => {
+                    addToCart(selectedProduct, selectedSpec, orderQuantity);
+                    setSelectedProduct(null);
+                  }}
+                  className="flex-1 py-3 px-4 bg-white border-2 border-[#78C4EC] text-[#78C4EC] hover:bg-[#E5F3FC] text-xs sm:text-sm font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <ShoppingCart size={18} />
+                  <span>加入購物車</span>
+                </button>
+                <button
+                  onClick={() => {
+                    addToCart(selectedProduct, selectedSpec, orderQuantity);
+                    setSelectedProduct(null);
+                    setIsCartOpen(true);
+                  }}
                   className="flex-1 py-3 px-4 bg-[#78C4EC] hover:bg-[#6db3e0] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2"
                 >
-                  <span>🛒 加入代購清單／立即下單</span>
+                  <span>⚡ 立即結帳</span>
                 </button>
-                <a
-                  href={`${lineOfficialUrl}?text=${encodeURIComponent(`您好，我想諮詢此商品：${selectedProduct.name}（規格：${selectedSpec || "預設"}，數量：${orderQuantity}）`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 py-3 px-4 bg-[#06C755] hover:bg-[#05b34c] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2"
-                >
-                  <span>💬 用 LINE 詢問此商品規格 ↗</span>
-                </a>
               </div>
+
             </div>
 
             {/* Modal Footer */}
@@ -1128,6 +1213,39 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* 許願單區塊 */}
+      <section className="px-6 md:px-10 pb-20 pt-10 bg-white">
+        <WishFormSection lineOfficialUrl={lineOfficialUrl} />
+      </section>
+
+      {/* Cart Checkout Modal */}
+      <CartCheckoutModal
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cartItems={cartItems}
+        updateQuantity={updateCartQuantity}
+        removeItem={removeCartItem}
+        lineOfficialUrl={lineOfficialUrl}
+        clearCart={() => setCartItems([])}
+      />
+
+      {/* 底部導覽列 (Mobile) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 pb-safe z-40 px-6 py-3 flex items-center justify-between shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <a href={lineOfficialUrl} target="_blank" rel="noreferrer" className="text-gray-400 hover:text-[#06C755] flex flex-col items-center gap-1 transition-colors">
+          <MessageCircle size={24} className="text-[#06C755]" />
+          <span className="text-[10px] font-bold text-[#06C755]">客服</span>
+        </a>
+        <button onClick={() => setIsCartOpen(true)} className="relative bg-[#78C4EC] text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-[#78C4EC]/30 flex items-center gap-2 transition-transform active:scale-95">
+          <ShoppingCart size={20} />
+          購物車結帳
+          {cartItems.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center font-extrabold border-2 border-white shadow-sm">
+              {cartItems.length}
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
