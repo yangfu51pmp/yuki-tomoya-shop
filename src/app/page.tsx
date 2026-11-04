@@ -201,10 +201,10 @@ export default function HomePage() {
         const kw = searchKeyword.toLowerCase().trim();
         const matchName = item.name.toLowerCase().includes(kw);
         const matchCategory = item.categoryName.toLowerCase().includes(kw);
-        const matchSubCategory = (item.subCategory || '').toLowerCase().includes(kw);
+        const matchSubCategory = ((item as any).subCategory || '').toLowerCase().includes(kw);
         const matchDesc = item.description.toLowerCase().includes(kw);
         const matchSpecs = item.specs?.some(s => s.toLowerCase().includes(kw));
-        const matchTags = item.badges?.some(b => b.toLowerCase().includes(kw));
+        const matchTags = ((item as any).badges || [])?.some((b: any) => b.toLowerCase().includes(kw));
 
         if (!matchName && !matchCategory && !matchSubCategory && !matchDesc && !matchSpecs && !matchTags) {
           return false;
