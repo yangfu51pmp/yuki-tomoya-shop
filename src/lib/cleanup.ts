@@ -16,7 +16,11 @@ export async function runSystemCleanup(client: RedisClientType): Promise<string>
 
     if (process.env.VERCEL_TOKEN) {
         try {
-            const res = await fetch('https://api.vercel.com/v6/deployments?limit=30', {
+            const projectId = process.env.VERCEL_PROJECT_ID;
+            const scopeParam = projectId ? `projectId=${encodeURIComponent(projectId)}` : `app=yuki-tomoya-shop`;
+            const listUrl = `https://api.vercel.com/v6/deployments?limit=30&${scopeParam}`;
+
+            const res = await fetch(listUrl, {
                 headers: {
                     'Authorization': `Bearer ${process.env.VERCEL_TOKEN}`
                 }
@@ -25,8 +29,15 @@ export async function runSystemCleanup(client: RedisClientType): Promise<string>
                 const data = await res.json();
                 const deployments = data.deployments || [];
 
-                if (deployments.length > 3) {
-                    const toDelete = deployments.slice(3);
+                const readyDeployments = deployments.filter((d: any) => d.state === "READY" || d.readyState === "READY");
+                const otherDeployments = deployments.filter((d: any) => d.state !== "READY" && d.readyState !== "READY");
+
+                const readyToKeep = readyDeployments.slice(0, 3);
+                const readyToDelete = readyDeployments.slice(3);
+
+                const toDelete = [...readyToDelete, ...otherDeployments];
+
+                if (toDelete.length > 0) {
                     for (const dep of toDelete) {
                         await fetch(`https://api.vercel.com/v13/deployments/${dep.uid}`, {
                             method: 'DELETE',
@@ -35,9 +46,9 @@ export async function runSystemCleanup(client: RedisClientType): Promise<string>
                             }
                         });
                     }
-                    vercelSummary = `已保留最新 3 筆部署，成功刪除 ${toDelete.length} 筆舊部署快照`;
+                    vercelSummary = `已保留最新 ${readyToKeep.length} 筆部署，成功刪除 ${toDelete.length} 筆舊部署快照`;
                 } else {
-                    vercelSummary = `目前僅有 ${deployments.length} 筆部署，無需清理`;
+                    vercelSummary = `目前有 ${readyToKeep.length} 筆 READY 部署，無需清理`;
                 }
             } else {
                 vercelSummary = `讀取 Vercel 部署失敗: ${res.status}`;
