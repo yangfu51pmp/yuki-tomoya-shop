@@ -15,6 +15,8 @@ export async function middleware(req: NextRequest) {
   // 1. 排除 LINE Webhook 與 Next.js 內部靜態資源
   if (
     pathname.startsWith("/api/line") ||
+    pathname.startsWith("/api/tomoya-utm") ||
+    pathname.startsWith("/api/tomoya-m3m7") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
     pathname.startsWith("/api/auth") // Optional: exclude next-auth endpoints if they exist
