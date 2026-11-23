@@ -595,7 +595,7 @@ ${currentContent}`;
   let openRouterError = "";
 
   if (claudeMatch) {
-    parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-3.7-sonnet", "anthropic/claude-3.5-sonnet", "openai/gpt-4o"]);
+    parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-sonnet-5.5", "anthropic/claude-sonnet-4.6", "openai/gpt-4o"]);
     if (parsed.error) openRouterError = parsed.error;
   } else if (gptMatch) {
     parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o", "openai/gpt-4o-mini"]);
@@ -607,7 +607,7 @@ ${currentContent}`;
     // 預設 Gemini -> 備援 Claude -> GPT-4o -> Grok
     parsed = await callGeminiJson(finalPrompt);
     if (!parsed.operations || parsed.operations.length === 0) {
-      parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-3.7-sonnet", "anthropic/claude-3.5-sonnet", "openai/gpt-4o"]);
+      parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-sonnet-5.5", "anthropic/claude-sonnet-4.6", "openai/gpt-4o"]);
       if (parsed.error) openRouterError = parsed.error;
     }
     if (!parsed.operations || parsed.operations.length === 0) {

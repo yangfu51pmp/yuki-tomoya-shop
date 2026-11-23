@@ -839,7 +839,7 @@ ${currentContent}`;
       parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o"]);
     }
   } else if (claudeMatch) {
-    parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"]);
+    parsed = await callOpenRouterJson(finalPrompt, ["anthropic/claude-sonnet-5.5", "anthropic/claude-sonnet-4.6", "openai/gpt-4o"]);
     if (parsed.error || (!parsed.operations || parsed.operations.length === 0)) {
       openRouterError = parsed.error || "Claude failed to return valid operations.";
       parsed = await callOpenRouterJson(finalPrompt, ["openai/gpt-4o"]);
